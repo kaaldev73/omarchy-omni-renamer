@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/
+.mypy_cache/
+
+# Generated release output
+build/
+dist/
+CaRe/build/
+CaRe/dist/
+*.rar
+*.exe
+
+# Local runtime state
+rename_backlog.json
+rename-history.json
