@@ -10,9 +10,9 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, GLib, Gtk
+from gi.repository import Adw, Gdk, Gtk
 
-from omni_session import COMMAND_DELAY_MS, RenameSession
+from omni_session import RenameSession
 
 SHORTCUTS = (
     "` + S     Cycle filename style\n"
@@ -55,7 +55,6 @@ class OmniRename(Adw.Application):
     def __init__(self, paths: list[str]):
         super().__init__(application_id="io.github.omnirename.omarchy")
         self.session = RenameSession(paths)
-        self.command_timer = 0
         self.syncing = False
         self.rendered_editor = 0
         self.find_entry: Gtk.Entry | None = None
@@ -148,22 +147,13 @@ class OmniRename(Adw.Application):
         self.sync()
         return result
 
-    def key_pressed(self, _controller, keyval, _code, _state):
+    def key_pressed(self, _controller, keyval, code, _state):
         char = Gdk.keyval_to_unicode(keyval)
-        handled = self.run_and_sync(self.session.key_down, Gdk.keyval_name(keyval) or "", chr(char) if char else "")
-        if char and self.session.command_pending:
-            if self.command_timer:
-                GLib.source_remove(self.command_timer)
-            self.command_timer = GLib.timeout_add(COMMAND_DELAY_MS, self.command_paused)
+        handled = self.run_and_sync(self.session.key_down, Gdk.keyval_name(keyval) or "", chr(char) if char else "", code)
         return Gdk.EVENT_STOP if handled else Gdk.EVENT_PROPAGATE
 
-    def key_released(self, _controller, keyval, _code, _state):
-        self.run_and_sync(self.session.key_up, Gdk.keyval_name(keyval) or "")
-
-    def command_paused(self):
-        self.command_timer = 0
-        self.run_and_sync(self.session.run_command)
-        return GLib.SOURCE_REMOVE
+    def key_released(self, _controller, keyval, code, _state):
+        self.run_and_sync(self.session.key_up, Gdk.keyval_name(keyval) or "", code)
 
     # Output
 
@@ -235,6 +225,8 @@ class OmniRename(Adw.Application):
                 target.grab_focus()
         elif kind == "focus_step":
             self.step_focus(request[1])
+        elif kind == "insert_text":
+            self.insert_text(request[1])
         elif kind == "close":
             self.quit()
         elif kind == "open":
@@ -250,6 +242,14 @@ class OmniRename(Adw.Application):
         focused = self.win.get_focus()
         current = controls.index(focused) if focused in controls else 0
         controls[(current + step) % len(controls)].grab_focus()
+
+    def insert_text(self, text: str):
+        field = self.win.get_focus()
+        if not isinstance(field, Gtk.Editable):
+            return
+        field.delete_selection()
+        position = field.insert_text(text, field.get_position())
+        field.set_position(position)
 
     # Dialogs
 

@@ -24,7 +24,7 @@ EDITOR_HINTS = {
 
 COMMAND_KEYS = ("grave", "dead_grave")
 ENTER_KEYS = ("Return", "KP_Enter")
-COMMAND_DELAY_MS = 1500
+MODIFIER_KEYS = ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R", "ISO_Level3_Shift")
 
 
 class RenameSession:
@@ -68,7 +68,12 @@ class RenameSession:
         self.safe = True
         self.editor_opened = 0
         self.command_mode = False
+        self.command_key_held = False
+        self.command_key_code: int | None = None
+        self.status_before_command = ""
         self.typed_command = ""
+        self.any_key_pressed = False
+        self.held_keys: set[str | int] = set()
         self.last_escape = 0.0
         self.preset_index = -1
         self._requests: list[tuple] = []
@@ -93,10 +98,6 @@ class RenameSession:
         if self.suffix_shown:
             pills.append("suffix")
         return pills
-
-    @property
-    def command_pending(self) -> bool:
-        return self.command_mode and bool(self.typed_command)
 
     def take_requests(self) -> list[tuple]:
         requests, self._requests = self._requests, []
@@ -135,15 +136,25 @@ class RenameSession:
 
     # Key input
 
-    def key_down(self, key: str, char: str = "") -> bool:
-        """Handle a key press; return True when the view should stop propagation."""
+    def key_down(self, key: str, char: str = "", code: int | None = None) -> bool:
+        """Handle a key press; return True when the view should stop propagation.
+
+        Command Mode lasts while the Command key is held. A press of a key that
+        is already down is auto-repeat and is ignored. `code` identifies the
+        physical key when the view knows it, so a key whose name changes with
+        Shift still releases cleanly.
+        """
+        if char == "`" or key in COMMAND_KEYS:
+            if not self.command_key_held:
+                self.end_command_mode()
+                self.command_key_held = True
+                self.command_key_code = code
+                self.command_mode = True
+                self.status_before_command = self.status
+                self.status = "⌁ Command mode — press the next key"
+            return True
         if not self.command_mode and key in ENTER_KEYS:
             self.rename()
-            return True
-        if not self.command_mode and (char == "`" or key in COMMAND_KEYS):
-            self.command_mode = True
-            self.typed_command = ""
-            self.status = "⌁ Command mode — press the next key"
             return True
         if not self.command_mode:
             if key == "Escape" and self._clock() - self.last_escape < 1.2:
@@ -151,16 +162,22 @@ class RenameSession:
                 self.last_escape = 0.0
                 return True
             return False
+        if key in MODIFIER_KEYS:
+            return True
         if key in ("Left", "Right"):
+            self.any_key_pressed = True
             self._requests.append(("focus_step", 1 if key == "Right" else -1))
             return True
+        if self._key_identity(key, code) in self.held_keys:
+            return True
+        self.held_keys.add(self._key_identity(key, code))
+        self.any_key_pressed = True
         if key == "Escape":
-            self.command_mode = False
-            self.typed_command = ""
+            self.end_command_mode()
             self._requests.append(("open", "confirm_revert"))
             return True
         if key in ENTER_KEYS:
-            self.command_mode = False
+            self.end_command_mode()
             self.rename()
             return True
         if char:
@@ -168,17 +185,43 @@ class RenameSession:
             self.status = "⌁ Command: ` + " + self.typed_command
         return True
 
-    def key_up(self, key: str) -> None:
-        """Handle a key release; Commands do not use releases yet."""
+    def key_up(self, key: str, code: int | None = None) -> None:
+        """Handle a key release; releasing the Command key runs the typed Command."""
+        if key not in COMMAND_KEYS and (code is None or code != self.command_key_code):
+            self.held_keys.discard(self._key_identity(key, code))
+            return
+        self.command_key_held = False
+        if not self.command_mode:
+            return
+        command = self.typed_command
+        tapped = not self.any_key_pressed
+        self.end_command_mode()
+        if command:
+            self.run_command(command)
+            return
+        self.status = self.status_before_command
+        if tapped:
+            self._requests.append(("insert_text", "`"))
 
     def focus_lost(self) -> None:
-        """Handle the window losing focus; Commands do not use it yet."""
+        """Cancel Command Mode without running anything; the release may never arrive."""
+        if self.command_mode:
+            self.status = self.status_before_command
+        self.end_command_mode()
+        self.command_key_held = False
 
-    def run_command(self) -> None:
-        """Run the typed Command; the view calls this once typing pauses."""
-        command = self.typed_command
-        self.typed_command = ""
+    def end_command_mode(self) -> None:
         self.command_mode = False
+        self.typed_command = ""
+        self.any_key_pressed = False
+        self.held_keys = set()
+
+    @staticmethod
+    def _key_identity(key: str, code: int | None) -> str | int:
+        return key if code is None else code
+
+    def run_command(self, command: str) -> None:
+        """Run one Command code."""
         self.status = "Command: ` + " + command
         if command == "1":
             self.show_editor("prefix")
@@ -245,6 +288,8 @@ class RenameSession:
             self._requests.append(("open", "shortcuts"))
         elif command == "return":
             self.rename()
+        else:
+            self.status = "Unknown command: " + command
 
     # Commands
 

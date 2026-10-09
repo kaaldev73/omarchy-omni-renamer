@@ -34,7 +34,8 @@ class SessionTestCase(unittest.TestCase):
         session.key_down("grave", "`")
         for char in code:
             session.key_down(char, char)
-        session.run_command()
+            session.key_up(char)
+        session.key_up("grave")
 
 
 class StyleCommandTests(SessionTestCase):
@@ -228,6 +229,8 @@ class RenameAndUndoTests(SessionTestCase):
         session.key_down("grave", "`")
         session.key_down("Return")
         self.assertTrue((self.files / "quarterly-report.txt").exists())
+        session.key_up("grave")
+        self.assertEqual(session.take_requests(), [("close",)])
 
     def test_undo_command_restores_the_original_name(self):
         session = self.session_for("Quarterly Report.txt")
@@ -250,35 +253,139 @@ class CommandModeTests(SessionTestCase):
         session = self.session_for("notes.txt")
         self.assertFalse(session.key_down("s", "s"))
 
-    def test_command_waits_for_the_pause_before_running(self):
+    def test_command_runs_on_release_of_backtick(self):
         session = self.session_for("notes.txt")
         session.key_down("grave", "`")
         session.key_down("s", "s")
-        self.assertTrue(session.command_pending)
+        session.key_up("s")
         self.assertEqual(session.status, "⌁ Command: ` + s")
         self.assertEqual(session.new_name, "notes.txt")
-        session.run_command()
-        self.assertFalse(session.command_pending)
+        session.key_up("grave")
+        self.assertEqual(session.status, "Style: snake_case")
+        self.assertFalse(session.key_down("s", "s"))
+
+    def test_held_backtick_auto_repeat_is_ignored(self):
+        session = self.session_for("Quarterly Report.txt")
+        for _ in range(4):
+            self.assertTrue(session.key_down("grave", "`"))
+        session.key_down("s", "s")
+        for _ in range(3):
+            session.key_down("grave", "`")
+        session.key_up("s")
+        session.key_up("grave")
+        self.assertEqual(session.new_name, "quarterly_report.txt")
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def test_key_held_down_while_backtick_is_held_counts_once(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        for _ in range(3):
+            session.key_down("5", "5")
+        session.key_up("5")
+        self.assertEqual(session.status, "⌁ Command: ` + 5")
+        session.key_up("grave")
+        self.assertEqual(session.new_name, "notes-01.txt")
+
+    def test_repeated_key_after_release_counts_again(self):
+        session = self.session_for("IMG 0001.txt")
+        self.command(session, "s")
+        self.command(session, "22")
+        self.assertEqual(session.status, "Contextual names suggested")
+
+    def test_shifted_key_released_by_keycode_counts_once(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`", code=49)
+        session.key_down("question", "?", code=61)
+        session.key_down("question", "?", code=61)
+        session.key_up("slash", code=61)
+        session.key_down("question", "?", code=61)
+        session.key_up("question", code=61)
+        session.key_up("grave", code=49)
+        self.assertEqual(session.status, "Unknown command: ??")
+
+    def test_multi_key_codes_run_on_release(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        self.command(session, "4c2")
+        self.assertEqual(session.new_name, "202403-client-notes.txt")
+        self.command(session, "41")
+        self.assertEqual(session.new_name, "202403-client-notes.txt")
+        self.command(session, "14")
+        self.assertEqual(session.new_name, "client-202403-notes.txt")
+        self.command(session, "5c123")
+        self.assertEqual(session.new_name, "client-202403-notes-001.txt")
+        self.command(session, "22")
+        self.command(session, "22x")
+        self.assertEqual(session.status, "AI suggestion removed")
+
+    def test_tapping_backtick_alone_inserts_a_literal_backtick(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        session.key_down("grave", "`")
+        session.key_down("Shift_L")
+        session.key_up("grave")
+        self.assertEqual(session.take_requests(), [("insert_text", "`")])
+        self.assertFalse(session.key_down("s", "s"))
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.status, "Press a pill to edit that part of the filename")
+
+    def test_command_key_released_under_another_name_still_runs(self):
+        session = self.session_for("notes.txt")
+        session.key_down("dead_grave", "`", code=49)
+        session.key_down("s", "s", code=39)
+        session.key_up("s", code=39)
+        session.key_up("asciitilde", code=49)
         self.assertEqual(session.status, "Style: snake_case")
 
     def test_unknown_command_changes_nothing(self):
         session = self.session_for("notes.txt")
         self.command(session, "zz")
         self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.status, "Unknown command: zz")
+        self.assertEqual(session.take_requests(), [])
+
+    def test_incomplete_command_changes_nothing(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "5c1")
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.status, "Unknown command: 5c1")
+
+    def test_focus_loss_cancels_the_command_without_running_it(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        session.key_down("s", "s")
+        session.focus_lost()
+        self.assertFalse(session.key_down("x", "x"))
+        self.assertEqual(session.status, "Press a pill to edit that part of the filename")
+        session.key_up("s")
+        session.key_up("grave")
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.take_requests(), [])
+        self.command(session, "s")
+        self.assertEqual(session.status, "Style: snake_case")
 
     def test_arrows_in_command_mode_move_between_pills(self):
         session = self.session_for("notes.txt")
         session.key_down("grave", "`")
         session.key_down("Right")
         session.key_down("Left")
-        self.assertEqual(session.take_requests(), [("focus_step", 1), ("focus_step", -1)])
+        session.key_down("Left")
+        self.assertEqual(session.take_requests(), [("focus_step", 1), ("focus_step", -1), ("focus_step", -1)])
+        session.key_up("grave")
+        self.assertEqual(session.take_requests(), [])
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.status, "Press a pill to edit that part of the filename")
 
     def test_escape_in_command_mode_asks_to_revert(self):
         session = self.session_for("notes.txt")
         session.key_down("grave", "`")
         session.key_down("Escape")
         self.assertEqual(session.take_requests(), [("open", "confirm_revert")])
-        self.assertFalse(session.command_mode)
+        self.assertFalse(session.key_down("s", "s"))
+        session.key_down("grave", "`")
+        session.key_up("grave")
+        self.assertEqual(session.take_requests(), [])
+        self.assertFalse(session.key_down("s", "s"))
 
     def test_cheat_sheet_command(self):
         session = self.session_for("notes.txt")
