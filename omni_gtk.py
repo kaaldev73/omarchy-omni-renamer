@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -113,6 +114,10 @@ class OmniRename(Adw.Application):
         focus = Gtk.EventControllerFocus()
         focus.connect("leave", lambda _controller: self.run_and_sync(self.session.focus_lost))
         self.win.add_controller(focus)
+        if os.environ.get("OMNI_THEME_PROTOTYPE"):
+            import theme_prototype  # PROTOTYPE, throwaway: theme colour variants
+
+            theme_prototype.install(self, root)
         self.sync()
         self.win.present()
 
