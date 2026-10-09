@@ -1,11 +1,31 @@
 /* OmniRename stylesheet. Colours come only from the theme palette (--omni-*,
-   see omni_theme.py) or from libadwaita's variables, which the palette recolours. */
+   see omni_theme.py) or from libadwaita's variables, which the palette recolours.
+   Pills, entries and inline editor controls share one radius, padding and font size
+   (the --control-* layout values below). */
 
-.title-1 { font-size: 38px; font-weight: 800; }
-.old-name { color: var(--omni-muted); font-size: 25px; }
-.new-name { color: var(--accent-color); font-size: 39px; font-weight: 600; }
-.pill { border: none; border-radius: 24px; padding: 10px 22px; font-size: 17px; }
-.pill-entry { border: none; border-radius: 24px; padding: 10px 16px; min-width: 150px; }
-.muted { color: var(--omni-muted); }
+:root {
+  --control-radius: 18px;
+  --control-padding: 8px 18px;
+  --control-font: 16px;
+}
+
+.item-count { color: var(--omni-muted); font-size: 15px; }
+.old-name { color: var(--omni-muted); font-size: 18px; }
+.new-name { color: var(--accent-color); font-size: 34px; font-weight: 600; }
+.status-line { color: var(--omni-muted); font-size: 14px; }
+
+.pill, .pill-entry {
+  border: none;
+  border-radius: var(--control-radius);
+  padding: var(--control-padding);
+  font-size: var(--control-font);
+  min-height: 0;
+}
+.pill-entry { min-width: 150px; }
+
+.preview-list { background: none; border-radius: var(--control-radius); }
+.preview-list > row { padding: 4px 12px; border-radius: var(--control-radius); }
+.preview-list .problem { color: var(--error-color); }
+
 list > row:selected { background-color: var(--omni-selection); }
 list > row:hover { background-color: color-mix(in srgb, var(--omni-selection) 60%, transparent); }

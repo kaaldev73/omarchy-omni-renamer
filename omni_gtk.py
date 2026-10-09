@@ -10,12 +10,15 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk
+from gi.repository import Adw, Gdk, Gtk, Pango
 
 from omni_session import RenameSession
 from omni_theme import load_theme, theme_css
 
 STYLESHEET_FILE = Path(__file__).resolve().parent / "omni.css"
+# One gap between every row and every control in the main window.
+SPACING = 10
+PREVIEW_MAX_HEIGHT = 240
 
 
 def padded_box(margin: int, spacing: int) -> Gtk.Box:
@@ -37,23 +40,20 @@ class OmniRename(Adw.Application):
 
     def do_activate(self):
         self.win = Adw.ApplicationWindow(application=self, title="OmniRename")
-        self.win.set_default_size(820, 360)
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        root.set_margin_top(28)
-        root.set_margin_bottom(22)
-        root.set_margin_start(32)
-        root.set_margin_end(32)
+        self.win.set_default_size(820, -1)
+        root = padded_box(24, SPACING)
         self.win.set_content(root)
 
-        title = Gtk.Label(label="OmniRename")
-        title.add_css_class("title-1")
-        root.append(title)
-
-        old = Gtk.Label(label=self.session.original_name)
+        header = Gtk.Box(spacing=SPACING, halign=Gtk.Align.CENTER)
+        count = Gtk.Label(label=self.session.item_count)
+        count.add_css_class("item-count")
+        old = Gtk.Label(label=self.session.original_name, ellipsize=Pango.EllipsizeMode.MIDDLE)
         old.add_css_class("old-name")
-        root.append(old)
+        header.append(count)
+        header.append(old)
+        root.append(header)
 
-        self.pills = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER)
+        self.pills = Gtk.Box(spacing=SPACING, halign=Gtk.Align.CENTER)
         self.date_button = self.pill_button("Date", "date")
         self.prefix_entry = self.pill_entry("Prefix", 8, self.session.set_prefix)
         self.name_entry = self.pill_entry("New Name", 12, self.session.set_name)
@@ -70,21 +70,29 @@ class OmniRename(Adw.Application):
             self.pills.append(control)
         root.append(self.pills)
 
-        self.new_preview = Gtk.Label()
-        self.new_preview.add_css_class("new-name")
-        root.append(self.new_preview)
-
-        self.detail = Gtk.Label(halign=Gtk.Align.CENTER)
-        self.detail.add_css_class("muted")
-        root.append(self.detail)
-
-        self.editor = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.editor = Gtk.Box(spacing=SPACING, halign=Gtk.Align.CENTER)
         self.editor.set_visible(False)
         root.append(self.editor)
 
-        self.list = Gtk.ListBox()
-        self.list.set_visible(False)
-        root.append(self.list)
+        self.new_preview = Gtk.Label(ellipsize=Pango.EllipsizeMode.MIDDLE)
+        self.new_preview.add_css_class("new-name")
+        root.append(self.new_preview)
+
+        self.status_line = Gtk.Label(halign=Gtk.Align.CENTER, ellipsize=Pango.EllipsizeMode.END)
+        self.status_line.add_css_class("status-line")
+        root.append(self.status_line)
+
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.list.add_css_class("preview-list")
+        self.preview_scroller = Gtk.ScrolledWindow(
+            child=self.list,
+            hscrollbar_policy=Gtk.PolicyType.NEVER,
+            propagate_natural_height=True,
+            max_content_height=PREVIEW_MAX_HEIGHT,
+            vexpand=True,
+        )
+        self.preview_scroller.set_visible(False)
+        root.append(self.preview_scroller)
 
         self.add_css()
         keys = Gtk.EventControllerKey()
@@ -158,7 +166,7 @@ class OmniRename(Adw.Application):
 
         self.sync_pills(session.visible_pills)
         self.new_preview.set_text(session.new_name)
-        self.detail.set_text(session.status)
+        self.status_line.set_text(session.status)
         if session.editor_opened != self.rendered_editor:
             self.rendered_editor = session.editor_opened
             self.render_editor(session.editor)
@@ -167,7 +175,7 @@ class OmniRename(Adw.Application):
             self.list.remove(child)
         for row in session.rows:
             self.list.append(self.preview_row(row))
-        self.list.set_visible(not session.safe)
+        self.preview_scroller.set_visible(session.preview_list_visible)
 
         for request in session.take_requests():
             self.handle(request)
@@ -182,12 +190,20 @@ class OmniRename(Adw.Application):
         for name, control in self.pill_controls.items():
             control.set_visible(name in visible)
 
-    def preview_row(self, row: dict) -> Gtk.Label:
-        label = Gtk.Label(label=f'{row["original"]}  →  {row["renamed"]}', xalign=0)
+    def preview_row(self, row: dict) -> Gtk.ListBoxRow:
+        """A read-only Preview row; it never takes focus away from the Pills."""
+        label = Gtk.Label(label=f'{row["original"]}  →  {row["renamed"]}', xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE)
         if row["problem"]:
             label.set_label(label.get_label() + "  —  " + row["problem"])
-            label.add_css_class("error")
-        return label
+            label.add_css_class("problem")
+        return Gtk.ListBoxRow(child=label, activatable=False, focusable=False)
+
+    def editor_toggle(self, label: str, toggled) -> Gtk.ToggleButton:
+        """An on/off choice in an inline editor, styled like a Pill."""
+        button = Gtk.ToggleButton(label=label)
+        button.add_css_class("pill")
+        button.connect("toggled", lambda button: self.run_and_sync(toggled, button.get_active()))
+        return button
 
     def render_editor(self, key: str | None):
         self.find_entry = None
@@ -195,25 +211,18 @@ class OmniRename(Adw.Application):
             self.editor.remove(child)
         self.editor.set_visible(key in ("date", "number", "replace"))
         if key == "date":
-            box = Gtk.Box(spacing=8)
             for label, fmt in (("YYYYMMDD", "%Y%m%d"), ("YYYYMM", "%Y%m"), ("YYYY", "%Y")):
-                check = Gtk.CheckButton(label=label)
-                check.connect("toggled", lambda button, f=fmt: self.run_and_sync(self.session.set_date, f, button.get_active()))
-                box.append(check)
-            self.editor.append(box)
+                self.editor.append(self.editor_toggle(label, lambda active, f=fmt: self.session.set_date(f, active)))
         elif key == "number":
-            check = Gtk.CheckButton(label="Enable numbering")
-            check.connect("toggled", lambda button: self.run_and_sync(self.session.set_number, button.get_active()))
-            self.editor.append(check)
+            self.editor.append(self.editor_toggle("Enable numbering", self.session.set_number))
         elif key == "replace":
-            box = Gtk.Box(spacing=8)
             self.find_entry = Gtk.Entry(placeholder_text="Find")
             replacement = Gtk.Entry(placeholder_text="Replace with")
+            for entry in (self.find_entry, replacement):
+                entry.add_css_class("pill-entry")
+                self.editor.append(entry)
             self.find_entry.connect("changed", lambda entry: self.run_and_sync(self.session.set_find, entry.get_text()))
             replacement.connect("changed", lambda entry: self.run_and_sync(self.session.set_replace, entry.get_text()))
-            box.append(self.find_entry)
-            box.append(replacement)
-            self.editor.append(box)
 
     def handle(self, request: tuple):
         kind = request[0]

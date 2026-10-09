@@ -342,6 +342,47 @@ class SafePreviewTests(SessionTestCase):
         self.assertFalse(session.safe)
 
 
+class StatusAndPreviewListTests(SessionTestCase):
+    def test_item_count_names_one_item_or_many(self):
+        self.assertEqual(self.session_for("a.txt").item_count, "1 item")
+        self.assertEqual(self.session_for("b.txt", "c.txt", "d.txt").item_count, "3 items")
+
+    def test_status_shows_a_new_problem_as_soon_as_it_appears(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        self.assertEqual(session.status, "a.txt: More than one item would receive this name")
+
+    def test_later_messages_replace_a_problem_in_the_status(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        self.command(session, "s")
+        self.assertEqual(session.status, "Style: snake_case")
+        session.set_name("same")
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def test_status_returns_to_the_hint_when_the_problem_clears(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        session.set_name("")
+        self.assertEqual(session.status, "Press a pill to edit that part of the filename")
+
+    def test_preview_list_shows_for_a_batch(self):
+        self.assertTrue(self.session_for("a.txt", "b.txt").preview_list_visible)
+
+    def test_preview_list_hides_when_the_preview_fails(self):
+        session = self.session_for("a.txt", "b.txt")
+        with mock.patch("omni_session.execute", side_effect=ValueError("bad options")):
+            session.set_name("x")
+        self.assertFalse(session.preview_list_visible)
+
+    def test_preview_list_shows_for_one_item_only_with_a_problem(self):
+        session = self.session_for("notes.txt")
+        self.assertFalse(session.preview_list_visible)
+        (self.files / "taken.txt").write_text("x", encoding="utf-8")
+        session.set_name("taken")
+        self.assertTrue(session.preview_list_visible)
+
+
 class RenameAndUndoTests(SessionTestCase):
     def test_enter_renames_the_files_and_asks_to_close(self):
         session = self.session_for("Quarterly Report.txt")

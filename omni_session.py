@@ -27,6 +27,8 @@ EDITOR_HINTS = {
     "style": "Choose how words are separated and capitalized",
 }
 
+READY_STATUS = "Press a pill to edit that part of the filename"
+
 DEFAULT_COMMAND_KEY = "`"
 # Key names that mean backtick even when the view cannot give its character, as with a dead key.
 BACKTICK_KEYS = ("grave", "dead_grave")
@@ -111,7 +113,7 @@ class RenameSession:
         self.prefix_editing = False
         self.suffix_editing = False
         self.editor: str | None = None
-        self.status = "Press a pill to edit that part of the filename"
+        self.status = READY_STATUS
         self.rows: list[dict] = []
         self.safe = True
         self.editor_opened = 0
@@ -145,6 +147,15 @@ class RenameSession:
             if row["problem"]:
                 return row["original"] + ": " + row["problem"]
         return ""
+
+    @property
+    def item_count(self) -> str:
+        return f"{len(self.paths)} item" + ("" if len(self.paths) == 1 else "s")
+
+    @property
+    def preview_list_visible(self) -> bool:
+        """The Preview list shows for a batch, or for one item with a Problem."""
+        return len(self.rows) > 1 or bool(self.first_problem)
 
     @property
     def visible_pills(self) -> list[str]:
@@ -478,6 +489,8 @@ class RenameSession:
         self.preview()
 
     def preview(self) -> None:
+        """Recompute the Preview; a new Problem takes the status line until the next message."""
+        previous_problem = self.first_problem
         self.options["name"] = self.name
         before = [self.prefix, self.date_token] if self.prefix_before_date else [self.date_token, self.prefix]
         self.options["prefixes"] = [value for value in before if value]
@@ -490,6 +503,11 @@ class RenameSession:
             return
         self.rows = [{**item, "problem": "" if item["safe"] else item["status"]} for item in result.get("items", [])]
         self.safe = bool(result.get("safe", True))
+        problem = self.first_problem
+        if problem and problem != previous_problem:
+            self.status = problem
+        elif not problem and previous_problem and self.status == previous_problem:
+            self.status = READY_STATUS
 
     def _bridge(self, command: str, payload: dict, failure: str) -> dict | None:
         """Run one bridge command; on failure show "<failure>: <reason>" and return None."""
