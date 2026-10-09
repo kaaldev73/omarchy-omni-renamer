@@ -1,0 +1,302 @@
+import os
+import tempfile
+import unittest
+from datetime import date
+from pathlib import Path
+from unittest import mock
+
+from omni_session import RenameSession
+
+
+class SessionTestCase(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        environment = mock.patch.dict(
+            os.environ,
+            {"XDG_STATE_HOME": str(self.root / "state"), "XDG_CONFIG_HOME": str(self.root / "config")},
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.files = self.root / "files"
+        self.files.mkdir()
+
+    def session_for(self, *names):
+        paths = []
+        for name in names:
+            path = self.files / name
+            path.write_text("x", encoding="utf-8")
+            paths.append(str(path))
+        return RenameSession(paths, today=lambda: date(2024, 3, 9))
+
+    def command(self, session, code):
+        session.key_down("grave", "`")
+        for char in code:
+            session.key_down(char, char)
+        session.run_command()
+
+
+class StyleCommandTests(SessionTestCase):
+    def test_style_command_cycles_to_the_next_style(self):
+        session = self.session_for("Quarterly Report.txt")
+        self.assertEqual(session.new_name, "quarterly-report.txt")
+        self.command(session, "s")
+        self.assertEqual(session.new_name, "quarterly_report.txt")
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def test_uppercase_style_command_works_like_lowercase(self):
+        session = self.session_for("Quarterly Report.txt")
+        self.command(session, "S")
+        self.assertEqual(session.new_name, "quarterly_report.txt")
+
+    def test_style_cycles_back_to_the_first_style(self):
+        session = self.session_for("Quarterly Report.txt")
+        for _ in range(7):
+            self.command(session, "s")
+        self.assertEqual(session.new_name, "quarterly-report.txt")
+
+
+class NamePartCommandTests(SessionTestCase):
+    def test_prefix_command_shows_the_prefix_pill_and_focuses_it(self):
+        session = self.session_for("notes.txt")
+        self.assertEqual(session.visible_pills, ["name"])
+        self.command(session, "1")
+        self.assertEqual(session.visible_pills, ["prefix", "name"])
+        self.assertEqual(session.take_requests(), [("focus", "prefix")])
+        session.set_prefix("client")
+        self.assertEqual(session.new_name, "client-notes.txt")
+
+    def test_remove_prefix_command_clears_and_hides_it(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "1")
+        session.set_prefix("client")
+        self.command(session, "1x")
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.visible_pills, ["name"])
+        self.assertEqual(session.prefix, "")
+
+    def test_suffix_command_and_its_removal(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "3")
+        self.assertEqual(session.visible_pills, ["name", "suffix"])
+        session.set_suffix("final")
+        self.assertEqual(session.new_name, "notes-final.txt")
+        self.command(session, "3x")
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_name_command_focuses_the_name(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "2")
+        self.assertEqual(session.take_requests(), [("focus", "name")])
+        session.set_name("Meeting Minutes")
+        self.assertEqual(session.new_name, "meeting-minutes.txt")
+
+    def test_date_commands_add_each_format_and_remove_it(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "4")
+        self.assertEqual(session.new_name, "20240309-notes.txt")
+        self.command(session, "4c2")
+        self.assertEqual(session.new_name, "202403-notes.txt")
+        self.command(session, "4c3")
+        self.assertEqual(session.new_name, "2024-notes.txt")
+        self.assertEqual(session.status, "Date enabled: YYYY")
+        self.command(session, "4x")
+        self.assertEqual(session.new_name, "notes.txt")
+
+    def test_prefix_and_date_order_commands(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        self.command(session, "4")
+        self.assertEqual(session.new_name, "20240309-client-notes.txt")
+        for code, expected in (
+            ("14", "client-20240309-notes.txt"),
+            ("41", "20240309-client-notes.txt"),
+            ("31", "client-20240309-notes.txt"),
+            ("13", "20240309-client-notes.txt"),
+        ):
+            self.command(session, code)
+            self.assertEqual(session.new_name, expected, code)
+
+    def test_number_commands(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "5")
+        self.assertEqual(session.new_name, "notes-01.txt")
+        self.command(session, "5c734")
+        self.assertEqual(session.new_name, "notes-0007.txt")
+        self.assertEqual(session.status, "Numbering: start 7, step 3, digits 4")
+        self.command(session, "5x")
+        self.assertEqual(session.new_name, "notes.txt")
+
+    def test_number_steps_across_a_batch(self):
+        session = self.session_for("a.txt", "b.txt")
+        self.command(session, "5c132")
+        self.assertEqual([row["renamed"] for row in session.rows], ["a-01.txt", "b-04.txt"])
+
+    def test_number_and_suffix_order_commands(self):
+        session = self.session_for("notes.txt")
+        session.set_suffix("final")
+        self.command(session, "5")
+        self.assertEqual(session.new_name, "notes-final-01.txt")
+        self.command(session, "35")
+        self.assertEqual(session.new_name, "notes-01-final.txt")
+        self.command(session, "53")
+        self.assertEqual(session.new_name, "notes-final-01.txt")
+
+    def test_find_and_replace_command_opens_the_replace_editor(self):
+        session = self.session_for("draft notes.txt")
+        self.command(session, "2c")
+        self.assertEqual(session.editor, "replace")
+        self.assertEqual(session.take_requests(), [("focus", "find")])
+        session.set_find("draft")
+        session.set_replace("final")
+        self.assertEqual(session.new_name, "final-notes.txt")
+
+
+class SuggestionCommandTests(SessionTestCase):
+    def test_suggestion_replaces_the_preview_and_can_be_removed(self):
+        session = self.session_for("IMG 0001.txt")
+        self.command(session, "s")
+        self.assertEqual(session.new_name, "img_0001.txt")
+        self.command(session, "22")
+        self.assertEqual(session.status, "Contextual names suggested")
+        self.assertEqual(session.new_name, "img-0001.txt")
+        self.command(session, "22x")
+        self.assertEqual(session.status, "AI suggestion removed")
+        self.assertEqual(session.new_name, "img_0001.txt")
+
+
+class PresetCommandTests(SessionTestCase):
+    def test_saved_preset_is_restored_by_the_cycle_command(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        self.command(session, "s")
+        self.command(session, "w")
+        self.assertEqual(session.take_requests(), [("open", "save_preset")])
+        self.assertTrue(session.save_preset("Client snake"))
+        self.assertEqual(session.status, "Preset saved: Client snake")
+
+        fresh = self.session_for("other notes.txt")
+        self.command(fresh, "e")
+        self.assertEqual(fresh.new_name, "client_other_notes.txt")
+        self.assertEqual(fresh.visible_pills, ["prefix", "name"])
+        self.assertEqual(fresh.status, "Preset: Client snake")
+
+    def test_cycling_a_preset_loads_its_name_and_drops_suggestions(self):
+        session = self.session_for("notes.txt")
+        session.set_name("Weekly Minutes")
+        session.set_suffix("final")
+        session.save_preset("Minutes")
+
+        fresh = self.session_for("IMG 0001.txt")
+        self.command(fresh, "s")
+        self.command(fresh, "22")
+        self.command(fresh, "e")
+        self.assertEqual(fresh.new_name, "weekly-minutes-final.txt")
+
+    def test_blank_preset_name_is_not_saved(self):
+        session = self.session_for("notes.txt")
+        self.assertFalse(session.save_preset("   "))
+
+    def test_cycle_without_presets_says_so(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "e")
+        self.assertEqual(session.status, "No saved presets")
+
+
+class SafePreviewTests(SessionTestCase):
+    def test_preview_is_safe_when_no_item_has_a_problem(self):
+        session = self.session_for("a.txt", "b.txt")
+        self.assertTrue(session.safe)
+
+    def test_two_items_with_the_same_result_make_the_preview_unsafe(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        self.assertFalse(session.safe)
+
+
+class RenameAndUndoTests(SessionTestCase):
+    def test_enter_renames_the_files_and_asks_to_close(self):
+        session = self.session_for("Quarterly Report.txt")
+        self.assertTrue(session.key_down("Return"))
+        self.assertTrue((self.files / "quarterly-report.txt").exists())
+        self.assertEqual(session.take_requests(), [("close",)])
+
+    def test_enter_in_command_mode_renames(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.key_down("grave", "`")
+        session.key_down("Return")
+        self.assertTrue((self.files / "quarterly-report.txt").exists())
+
+    def test_undo_command_restores_the_original_name(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        renamed = RenameSession([str(self.files / "quarterly-report.txt")])
+        self.command(renamed, "u")
+        self.assertTrue((self.files / "Quarterly Report.txt").exists())
+
+    def test_history_restore_undoes_one_rename(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        entries = session.history_entries()
+        self.assertEqual([Path(current).name for current, _ in entries], ["quarterly-report.txt"])
+        session.restore_from_history(entries[0][0])
+        self.assertTrue((self.files / "Quarterly Report.txt").exists())
+
+
+class CommandModeTests(SessionTestCase):
+    def test_typing_without_command_mode_is_left_to_the_focused_field(self):
+        session = self.session_for("notes.txt")
+        self.assertFalse(session.key_down("s", "s"))
+
+    def test_command_waits_for_the_pause_before_running(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        session.key_down("s", "s")
+        self.assertTrue(session.command_pending)
+        self.assertEqual(session.status, "⌁ Command: ` + s")
+        self.assertEqual(session.new_name, "notes.txt")
+        session.run_command()
+        self.assertFalse(session.command_pending)
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def test_unknown_command_changes_nothing(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "zz")
+        self.assertEqual(session.new_name, "notes.txt")
+
+    def test_arrows_in_command_mode_move_between_pills(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        session.key_down("Right")
+        session.key_down("Left")
+        self.assertEqual(session.take_requests(), [("focus_step", 1), ("focus_step", -1)])
+
+    def test_escape_in_command_mode_asks_to_revert(self):
+        session = self.session_for("notes.txt")
+        session.key_down("grave", "`")
+        session.key_down("Escape")
+        self.assertEqual(session.take_requests(), [("open", "confirm_revert")])
+        self.assertFalse(session.command_mode)
+
+    def test_cheat_sheet_command(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "?")
+        self.assertEqual(session.take_requests(), [("open", "shortcuts")])
+
+    def test_revert_clears_every_rule(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "1")
+        session.set_prefix("client")
+        self.command(session, "4")
+        self.command(session, "5")
+        session.set_name("Other")
+        session.revert()
+        self.assertEqual(session.new_name, "notes.txt")
+        self.assertEqual(session.visible_pills, ["name"])
+        self.assertEqual(session.status, "Original name restored")
+
+
+if __name__ == "__main__":
+    unittest.main()
