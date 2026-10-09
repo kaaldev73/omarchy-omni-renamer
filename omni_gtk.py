@@ -74,12 +74,13 @@ class OmniRename(Adw.Application):
         self.new_preview.add_css_class("new-name")
         root.append(self.new_preview)
 
+        self.detail = Gtk.Label(halign=Gtk.Align.CENTER)
+        self.detail.add_css_class("dim-label")
+        root.append(self.detail)
+
         self.editor = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.editor.set_visible(False)
         root.append(self.editor)
-        self.detail = Gtk.Label(halign=Gtk.Align.CENTER)
-        self.detail.add_css_class("dim-label")
-        self.editor.append(self.detail)
 
         self.list = Gtk.ListBox()
         self.list.set_visible(False)
@@ -163,27 +164,35 @@ class OmniRename(Adw.Application):
         while (child := self.list.get_first_child()) is not None:
             self.list.remove(child)
         for row in session.rows:
-            self.list.append(Gtk.Label(label=f'{row["original"]}  →  {row["renamed"]}', xalign=0))
+            self.list.append(self.preview_row(row))
+        self.list.set_visible(not session.safe)
 
         for request in session.take_requests():
             self.handle(request)
+
+    def preview_row(self, row: dict) -> Gtk.Label:
+        label = Gtk.Label(label=f'{row["original"]}  →  {row["renamed"]}', xalign=0)
+        if row["problem"]:
+            label.set_label(label.get_label() + "  —  " + row["problem"])
+            label.add_css_class("error")
+        return label
 
     def render_editor(self, key: str | None):
         self.find_entry = None
         while (child := self.editor.get_first_child()) is not None:
             self.editor.remove(child)
-        self.editor.append(self.detail)
+        self.editor.set_visible(key in ("date", "number", "replace"))
         if key == "date":
             box = Gtk.Box(spacing=8)
             for label, fmt in (("YYYYMMDD", "%Y%m%d"), ("YYYYMM", "%Y%m"), ("YYYY", "%Y")):
                 check = Gtk.CheckButton(label=label)
                 check.connect("toggled", lambda button, f=fmt: self.run_and_sync(self.session.set_date, f, button.get_active()))
                 box.append(check)
-            self.editor.prepend(box)
+            self.editor.append(box)
         elif key == "number":
             check = Gtk.CheckButton(label="Enable numbering")
             check.connect("toggled", lambda button: self.run_and_sync(self.session.set_number, button.get_active()))
-            self.editor.prepend(check)
+            self.editor.append(check)
         elif key == "replace":
             box = Gtk.Box(spacing=8)
             self.find_entry = Gtk.Entry(placeholder_text="Find")
@@ -192,7 +201,7 @@ class OmniRename(Adw.Application):
             replacement.connect("changed", lambda entry: self.run_and_sync(self.session.set_replace, entry.get_text()))
             box.append(self.find_entry)
             box.append(replacement)
-            self.editor.prepend(box)
+            self.editor.append(box)
 
     def handle(self, request: tuple):
         kind = request[0]

@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Callable
 
 from care_cli import execute
-from care_core import RenameHistory
+from care_core import RenameError, RenameHistory
+
+# Errors the JSON bridge raises for a refused or failed request.
+BRIDGE_ERRORS = (RenameError, ValueError, TypeError, OSError)
 
 # Order of the `s` Command cycle; Title Case is deliberately not in the cycle.
 STYLES = ["kebab-case", "snake_case", "PascalCase", "camelCase", "UPPERCASE", "lowercase", "Sentence case"]
@@ -134,6 +137,14 @@ class RenameSession:
     @property
     def new_name(self) -> str:
         return self.rows[0]["renamed"] if self.rows else "NewName.type"
+
+    @property
+    def first_problem(self) -> str:
+        """The first Problem in the Preview as "<original>: <problem>", or "" for a Safe Preview."""
+        for row in self.rows:
+            if row["problem"]:
+                return row["original"] + ": " + row["problem"]
+        return ""
 
     @property
     def visible_pills(self) -> list[str]:
@@ -387,17 +398,23 @@ class RenameSession:
     def save_preset(self, name: str) -> bool:
         if not name.strip():
             return False
-        execute("save-preset", {"name": name, "preset": dict(self.options)})
-        self.status = "Preset saved: " + name.strip()
+        if self._bridge("save-preset", {"name": name, "preset": dict(self.options)}, "Preset not saved") is not None:
+            self.status = "Preset saved: " + name.strip()
         return True
 
     def cycle_preset(self) -> None:
-        names = execute("list-presets", {})["names"]
+        listed = self._bridge("list-presets", {}, "Presets unavailable")
+        if listed is None:
+            return
+        names = listed["names"]
         if not names:
             self.status = "No saved presets"
             return
         self.preset_index = (self.preset_index + 1) % len(names)
-        loaded = execute("load-preset", {"name": names[self.preset_index]})["preset"]
+        result = self._bridge("load-preset", {"name": names[self.preset_index]}, "Preset not loaded")
+        if result is None:
+            return
+        loaded = result["preset"]
         self.options.update(loaded)
         prefixes = list(loaded.get("prefixes", []))
         self.date_token = next((x for x in prefixes if str(x).isdigit() and len(str(x)) in (4, 6, 8)), "")
@@ -417,11 +434,33 @@ class RenameSession:
         return list(RenameHistory().load().items())
 
     def restore_from_history(self, current_path: str) -> None:
-        execute("undo", {"paths": [current_path]})
+        self._restore([current_path])
+
+    def undo(self) -> None:
+        self._restore(self.paths)
+
+    def _restore(self, paths: list[str]) -> None:
+        """Undo the recorded renames of `paths`, then preview the batch under its restored names."""
+        try:
+            originals = RenameHistory().load()
+        except BRIDGE_ERRORS as error:
+            self.status = "Undo failed: " + str(error)
+            return
+        result = self._bridge("undo", {"paths": paths}, "Undo failed")
+        if result is None:
+            return
+        restored = result["paths"]
+        if not restored:
+            self.status = "Nothing to undo for these items"
+            return
+        self.paths = [originals.get(path, path) if path in paths else path for path in self.paths]
         self.preview()
+        self.status = f"Restored {len(restored)} item" + ("" if len(restored) == 1 else "s")
 
     def suggest_names(self) -> None:
-        result = execute("recommend", {"paths": self.paths, "allow_agent": False, "include_content": False})
+        result = self._bridge("recommend", {"paths": self.paths, "allow_agent": False, "include_content": False}, "No suggestion available")
+        if result is None:
+            return
         recommendations = result.get("recommendations", [])
         self.suggested_names = [item["suggested_name"] for item in recommendations] if recommendations else None
         self.status = "Contextual names suggested" if self.suggested_names else "No suggestion available"
@@ -433,18 +472,35 @@ class RenameSession:
         self.options["prefixes"] = [value for value in before if value]
         self.options["suffixes"] = [self.suffix] if self.suffix else []
         command = "preview-manual" if self.suggested_names else "preview"
-        payload = {"paths": self.paths, "options": self.options, "names": self.suggested_names or []}
-        result = execute(command, payload)
-        self.rows = result.get("items", [])
+        result = self._bridge(command, self._rename_payload(), "Preview failed")
+        if result is None:
+            self.rows = []
+            self.safe = False
+            return
+        self.rows = [{**item, "problem": "" if item["safe"] else item["status"]} for item in result.get("items", [])]
         self.safe = bool(result.get("safe", True))
 
-    def rename(self) -> None:
-        if execute("apply", {"paths": self.paths, "options": self.options}).get("ok"):
-            self._requests.append(("close",))
+    def _bridge(self, command: str, payload: dict, failure: str) -> dict | None:
+        """Run one bridge command; on failure show "<failure>: <reason>" and return None."""
+        try:
+            return execute(command, payload)
+        except BRIDGE_ERRORS as error:
+            self.status = failure + ": " + str(error)
+            return None
 
-    def undo(self) -> None:
-        execute("undo", {"paths": self.paths})
+    def _rename_payload(self) -> dict:
+        return {"paths": self.paths, "options": self.options, "names": self.suggested_names or []}
+
+    def rename(self) -> None:
+        """Rename only a Safe Preview, with the Suggestions when they are active."""
         self.preview()
+        if not self.safe:
+            self.status = self.first_problem or self.status
+            return
+        command = "apply-manual" if self.suggested_names else "apply"
+        if self._bridge(command, self._rename_payload(), "Rename failed") is None:
+            return
+        self._requests.append(("close",))
 
     def revert(self) -> None:
         self.name = ""

@@ -5,6 +5,8 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
+from care_cli import execute
+from care_core import RenameError
 from omni_session import RenameSession
 
 
@@ -247,6 +249,127 @@ class RenameAndUndoTests(SessionTestCase):
         session.restore_from_history(entries[0][0])
         self.assertTrue((self.files / "Quarterly Report.txt").exists())
 
+    def test_rename_applies_active_suggestions(self):
+        session = self.session_for("IMG 0001.txt")
+        self.command(session, "s")
+        self.command(session, "22")
+        session.key_down("Return")
+        self.assertTrue((self.files / "img-0001.txt").exists())
+        self.assertFalse((self.files / "img_0001.txt").exists())
+        self.assertEqual(session.take_requests(), [("close",)])
+
+    def test_rename_applies_the_rules_without_suggestions(self):
+        session = self.session_for("IMG 0001.txt")
+        self.command(session, "s")
+        self.command(session, "22")
+        self.command(session, "22x")
+        session.key_down("Return")
+        self.assertTrue((self.files / "img_0001.txt").exists())
+
+    def test_enter_with_an_unsafe_preview_renames_nothing_and_shows_the_problem(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        session.key_down("Return")
+        self.assertTrue((self.files / "a.txt").exists())
+        self.assertTrue((self.files / "b.txt").exists())
+        self.assertEqual(session.status, "a.txt: More than one item would receive this name")
+        self.assertEqual(session.take_requests(), [])
+
+    def test_rows_with_a_problem_carry_its_text(self):
+        session = self.session_for("a.txt", "b.txt")
+        session.set_name("same")
+        self.assertEqual(
+            [(row["original"], row["problem"]) for row in session.rows],
+            [("a.txt", "More than one item would receive this name"),
+             ("b.txt", "More than one item would receive this name")],
+        )
+        session.set_name("")
+        self.assertEqual([row["problem"] for row in session.rows], ["", ""])
+
+    def test_existing_target_is_a_problem(self):
+        session = self.session_for("notes.txt")
+        (self.files / "taken.txt").write_text("x", encoding="utf-8")
+        session.set_name("taken")
+        self.assertEqual(session.rows[0]["problem"], "A file or folder with this name already exists")
+
+    def test_vanished_source_blocks_the_rename_and_the_window_stays_open(self):
+        session = self.session_for("Quarterly Report.txt")
+        (self.files / "Quarterly Report.txt").unlink()
+        session.rename()
+        self.assertEqual(session.take_requests(), [])
+        self.assertEqual(session.status, "Quarterly Report.txt: Source no longer exists")
+
+    def test_failure_during_the_rename_is_shown_in_the_status_line(self):
+        session = self.session_for("Quarterly Report.txt")
+        with mock.patch("omni_session.execute", side_effect=failing_apply):
+            session.rename()
+        self.assertEqual(session.take_requests(), [])
+        self.assertEqual(session.status, "Rename failed: Destination now exists")
+        self.assertTrue((self.files / "Quarterly Report.txt").exists())
+
+    def test_undo_without_history_says_so(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "u")
+        self.assertEqual(session.status, "Nothing to undo for these items")
+
+    def test_undo_failure_is_shown(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        (self.files / "Quarterly Report.txt").write_text("in the way", encoding="utf-8")
+        renamed = RenameSession([str(self.files / "quarterly-report.txt")])
+        self.command(renamed, "u")
+        self.assertEqual(renamed.status, "Undo failed: Cannot restore quarterly-report.txt: Quarterly Report.txt exists.")
+        self.assertTrue((self.files / "quarterly-report.txt").exists())
+
+    def test_undo_shows_the_restored_names_in_the_preview(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        renamed = RenameSession([str(self.files / "quarterly-report.txt")])
+        self.command(renamed, "u")
+        self.assertEqual(renamed.status, "Restored 1 item")
+        self.assertEqual(renamed.original_name, "Quarterly Report.txt")
+        self.assertTrue(renamed.safe)
+
+    def test_history_restore_failure_is_shown(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        (self.files / "Quarterly Report.txt").write_text("in the way", encoding="utf-8")
+        session.restore_from_history(str(self.files / "quarterly-report.txt"))
+        self.assertTrue(session.status.startswith("Undo failed: Cannot restore"))
+
+    def test_history_restore_shows_the_restored_name(self):
+        session = self.session_for("Quarterly Report.txt")
+        session.rename()
+        renamed = RenameSession([str(self.files / "quarterly-report.txt")])
+        renamed.restore_from_history(str(self.files / "quarterly-report.txt"))
+        self.assertEqual(renamed.original_name, "Quarterly Report.txt")
+        self.assertTrue(renamed.safe)
+
+    def test_unreadable_presets_are_reported(self):
+        session = self.session_for("notes.txt")
+        presets = self.root / "config" / "OmniRename" / "presets.json"
+        presets.parent.mkdir(parents=True)
+        presets.write_text("{broken", encoding="utf-8")
+        self.command(session, "e")
+        self.assertEqual(session.status, "Presets unavailable: The preset file is unreadable.")
+
+    def test_invalid_replacement_pattern_is_a_problem(self):
+        session = self.session_for("notes.txt")
+        session.set_find("notes")
+        session.set_replace("\\")
+        self.assertFalse(session.safe)
+        self.assertTrue(session.rows[0]["problem"].startswith("Invalid regular expression"))
+        session.key_down("Return")
+        self.assertTrue((self.files / "notes.txt").exists())
+        self.assertTrue(session.status.startswith("notes.txt: Invalid regular expression"))
+
+    def test_bridge_error_during_preview_is_shown(self):
+        session = self.session_for("notes.txt")
+        with mock.patch("omni_session.execute", side_effect=ValueError("bad options")):
+            session.set_name("x")
+        self.assertFalse(session.safe)
+        self.assertEqual(session.status, "Preview failed: bad options")
+
 
 class CommandModeTests(SessionTestCase):
     def test_typing_without_command_mode_is_left_to_the_focused_field(self):
@@ -487,6 +610,12 @@ class CommandKeySettingTests(SessionTestCase):
         session = self.session_for("Quarterly Report.txt")
         self.command(session, "s")
         self.assertEqual(session.new_name, "quarterly_report.txt")
+
+
+def failing_apply(command, payload):
+    if command in ("apply", "apply-manual"):
+        raise RenameError("Destination now exists")
+    return execute(command, payload)
 
 
 if __name__ == "__main__":
