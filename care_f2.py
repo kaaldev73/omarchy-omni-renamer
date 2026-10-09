@@ -1,4 +1,4 @@
-"""Contextual F2 dispatcher for CaRe on Omarchy."""
+"""Contextual F2 dispatcher for OmniRename on Omarchy."""
 
 from __future__ import annotations
 

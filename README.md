@@ -4,6 +4,11 @@ OmniRename replaces the normal `F2` rename flow in Omarchy's Nautilus file manag
 with a theme-aware, preview-first batch renamer. Outside Nautilus, `F2` is
 forwarded to the focused application unchanged.
 
+The UI is a GTK window that `F2` opens on the current Nautilus selection. The
+Omarchy plugin itself is a thin stub: it declares a do-nothing service so that
+`omarchy plugin add` can install the files, and the install script adds the
+`F2` binding.
+
 ## Features
 
 - Live old/new-name preview
@@ -19,12 +24,10 @@ forwarded to the focused application unchanged.
 - Duplicate, existing-target, invalid-name, and stale-preview checks
 - Transactional staging with rollback diagnostics
 - Persistent, atomic undo history
-- Native Omarchy theme colors and overlay behavior
-- Optional Codex-powered contextual filename recommendations
+- Native Omarchy theme colors
+- Optional Codex-powered contextual filename Suggestions
 - Metadata-only agent mode by default; text excerpts require explicit opt-in
-- Local deterministic recommendations when Codex is unavailable
-- Editable agent recommendations that pass through the normal safety preview
-- Category-based naming guide and hover explanations for advanced controls
+- Local deterministic Suggestions when Codex is unavailable
 
 ## Install
 
@@ -41,19 +44,19 @@ in a standard Omarchy installation.
 ## Use
 
 1. Select one or more local files or folders in Nautilus.
-2. Press `F2`.
-3. Compose rename rules and inspect every proposed result.
-   Save a named preset if you want to reuse the same rules later.
-4. Select **Rename** when the preview is safe.
-5. Optionally choose **Suggest with agent**. Review or edit every recommendation.
-6. Reopen OmniRename on renamed items and select **Undo** to restore their names.
+2. Press `F2` to open the OmniRename window.
+3. Type a base name and use backtick Commands to add a prefix, suffix, date or
+   numbering, change the Style, or load a Preset. `` `? `` shows the cheat sheet.
+4. Inspect every proposed result in the preview, then press `Enter` to rename.
+5. Optionally use `` `22 `` for contextual name suggestions. They pass through the
+   same Preview, and only a Safe Preview is renamed.
+6. Reopen OmniRename on renamed items and use `` `u `` to restore their names.
 
-Agent recommendations are never applied automatically. Local suggestions are the
-default. Filenames and basic metadata are supplied to Codex only when **Use Codex**
-is explicitly checked before requesting suggestions.
-File text is limited to a short excerpt and is included only when **Share text
-excerpts** is checked. The agent runs ephemerally with a read-only sandbox and a
-strict JSON response schema.
+Suggestions in the window are local and deterministic; nothing is sent to an
+agent. The optional Codex agent (`omni_agent.py`) runs ephemerally with a
+read-only sandbox and a strict JSON response schema, shares only filenames and
+basic metadata unless text excerpts are explicitly enabled, and is not wired
+into the window.
 
 ## Development
 
@@ -63,9 +66,11 @@ python care_cli.py preview '{"paths":["/tmp/Example File.txt"],"options":{"case_
 omarchy plugin validate .
 ```
 
-`care_core.py` is the safe rename engine. `care_cli.py` is the JSON bridge,
-`OmniRename.qml` is the Omarchy overlay, and `care_f2.py` is the contextual shortcut
-adapter.
+`care_core.py` is the safe rename engine and `care_cli.py` is the JSON bridge.
+`omni_session.py` holds the Rename Session behind the window, and `omni_gtk.py` is
+the GTK window that draws it. `care_f2.py` is the contextual shortcut adapter that
+opens the window. `Service.qml` is the do-nothing service stub the plugin manifest
+declares. The earlier QML overlay is kept on the `prototype/qml-overlay` branch.
 
 ## Remove
 

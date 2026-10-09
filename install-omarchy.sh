@@ -32,4 +32,4 @@ if [[ -n "$errors" ]]; then
   exit 1
 fi
 
-echo "CaRe now handles F2 in Nautilus and forwards F2 in other applications."
+echo "OmniRename now handles F2 in Nautilus and forwards F2 in other applications."

@@ -1,4 +1,4 @@
-"""JSON command interface between the Omarchy overlay and rename engine."""
+"""JSON command interface between the OmniRename window and rename engine."""
 
 from __future__ import annotations
 

@@ -5,9 +5,8 @@
   "version": "2.0.0",
   "author": "OmniRename",
   "description": "Safe, preview-first batch renaming integrated with Omarchy and Nautilus",
-  "kinds": ["overlay"],
-  "keepLoaded": true,
+  "kinds": ["service"],
   "entryPoints": {
-    "overlay": "OmniRename.qml"
+    "service": "Service.qml"
   }
 }
