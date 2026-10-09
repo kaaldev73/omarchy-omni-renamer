@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import time
 from datetime import date
 from pathlib import Path
@@ -22,9 +24,51 @@ EDITOR_HINTS = {
     "style": "Choose how words are separated and capitalized",
 }
 
-COMMAND_KEYS = ("grave", "dead_grave")
+DEFAULT_COMMAND_KEY = "`"
+# Key names that mean backtick even when the view cannot give its character, as with a dead key.
+BACKTICK_KEYS = ("grave", "dead_grave")
 ENTER_KEYS = ("Return", "KP_Enter")
 MODIFIER_KEYS = ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R", "ISO_Level3_Shift")
+
+CHEAT_SHEET = (
+    "` + S     Cycle filename style\n"
+    "` + 1     Add/edit Prefix       ` + 1x   Remove Prefix\n"
+    "` + 2     Edit New Name          ` + 22   Suggest contextual name\n"
+    "` + 22x   Remove suggestion      ` + 2c   Find and Replace\n"
+    "` + 3     Add/edit Suffix       ` + 3x   Remove Suffix\n"
+    "` + 4     Date YYYYMMDD          ` + 4c2  Date YYYYMM\n"
+    "` + 4c3   Date YYYY             ` + 4x   Remove Date\n"
+    "` + 5     Number defaults 112   ` + 5cXYZ Configure numbering\n"
+    "` + 5x    Remove Number\n"
+    "` + 41    Date then Prefix      ` + 14   Prefix then Date\n"
+    "` + 53    Suffix then Number    ` + 35   Number then Suffix\n"
+    "` + W     Save preset           ` + E    Cycle/load presets\n"
+    "` + Esc   Revert; Esc again opens history\n"
+    "` + ←/→   Move through visible fields\n"
+    "Enter     Apply rename"
+)
+
+
+def default_settings_path() -> Path:
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "OmniRename" / "settings.json"
+
+
+def load_command_key() -> str:
+    """Return the configured Command Mode key, or backtick when the setting is missing or invalid.
+
+    A valid key is one printable character that cannot appear in a Command code.
+    """
+    try:
+        settings = json.loads(default_settings_path().read_text(encoding="utf-8"))
+        key = settings["command_key"]
+    except (OSError, ValueError, TypeError, KeyError):
+        return DEFAULT_COMMAND_KEY
+    if not isinstance(key, str) or len(key) != 1 or not key.isprintable() or key.isspace():
+        return DEFAULT_COMMAND_KEY
+    if (key.isascii() and key.isalnum()) or key == "?":
+        return DEFAULT_COMMAND_KEY
+    return key
 
 
 class RenameSession:
@@ -42,6 +86,7 @@ class RenameSession:
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.paths = paths
+        self.command_key = load_command_key()
         self._today = today
         self._clock = clock
         self.options = {
@@ -70,6 +115,7 @@ class RenameSession:
         self.command_mode = False
         self.command_key_held = False
         self.command_key_code: int | None = None
+        self.command_key_name = ""
         self.status_before_command = ""
         self.typed_command = ""
         self.any_key_pressed = False
@@ -98,6 +144,10 @@ class RenameSession:
         if self.suffix_shown:
             pills.append("suffix")
         return pills
+
+    @property
+    def cheat_sheet(self) -> str:
+        return CHEAT_SHEET.replace("`", self.command_key)
 
     def take_requests(self) -> list[tuple]:
         requests, self._requests = self._requests, []
@@ -144,11 +194,12 @@ class RenameSession:
         physical key when the view knows it, so a key whose name changes with
         Shift still releases cleanly.
         """
-        if char == "`" or key in COMMAND_KEYS:
+        if self._is_command_key(key, char):
             if not self.command_key_held:
                 self.end_command_mode()
                 self.command_key_held = True
                 self.command_key_code = code
+                self.command_key_name = key
                 self.command_mode = True
                 self.status_before_command = self.status
                 self.status = "⌁ Command mode — press the next key"
@@ -182,12 +233,13 @@ class RenameSession:
             return True
         if char:
             self.typed_command += char.lower()
-            self.status = "⌁ Command: ` + " + self.typed_command
+            self.status = "⌁ Command: " + self.command_key + " + " + self.typed_command
         return True
 
     def key_up(self, key: str, code: int | None = None) -> None:
         """Handle a key release; releasing the Command key runs the typed Command."""
-        if key not in COMMAND_KEYS and (code is None or code != self.command_key_code):
+        released_command_key = (bool(key) and key == self.command_key_name) or self._is_command_key(key, "")
+        if not released_command_key and (code is None or code != self.command_key_code):
             self.held_keys.discard(self._key_identity(key, code))
             return
         self.command_key_held = False
@@ -201,7 +253,7 @@ class RenameSession:
             return
         self.status = self.status_before_command
         if tapped:
-            self._requests.append(("insert_text", "`"))
+            self._requests.append(("insert_text", self.command_key))
 
     def focus_lost(self) -> None:
         """Cancel Command Mode without running anything; the release may never arrive."""
@@ -216,13 +268,18 @@ class RenameSession:
         self.any_key_pressed = False
         self.held_keys = set()
 
+    def _is_command_key(self, key: str, char: str) -> bool:
+        if self.command_key == DEFAULT_COMMAND_KEY and key in BACKTICK_KEYS:
+            return True
+        return char == self.command_key
+
     @staticmethod
     def _key_identity(key: str, code: int | None) -> str | int:
         return key if code is None else code
 
     def run_command(self, command: str) -> None:
         """Run one Command code."""
-        self.status = "Command: ` + " + command
+        self.status = "Command: " + self.command_key + " + " + command
         if command == "1":
             self.show_editor("prefix")
         elif command == "1x":

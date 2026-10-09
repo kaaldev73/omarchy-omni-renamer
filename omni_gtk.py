@@ -14,24 +14,6 @@ from gi.repository import Adw, Gdk, Gtk
 
 from omni_session import RenameSession
 
-SHORTCUTS = (
-    "` + S     Cycle filename style\n"
-    "` + 1     Add/edit Prefix       ` + 1x   Remove Prefix\n"
-    "` + 2     Edit New Name          ` + 22   Suggest contextual name\n"
-    "` + 22x   Remove suggestion      ` + 2c   Find and Replace\n"
-    "` + 3     Add/edit Suffix       ` + 3x   Remove Suffix\n"
-    "` + 4     Date YYYYMMDD          ` + 4c2  Date YYYYMM\n"
-    "` + 4c3   Date YYYY             ` + 4x   Remove Date\n"
-    "` + 5     Number defaults 112   ` + 5cXYZ Configure numbering\n"
-    "` + 5x    Remove Number\n"
-    "` + 41    Date then Prefix      ` + 14   Prefix then Date\n"
-    "` + 53    Suffix then Number    ` + 35   Number then Suffix\n"
-    "` + W     Save preset           ` + E    Cycle/load presets\n"
-    "` + Esc   Revert; Esc again opens history\n"
-    "` + ←/→   Move through visible fields\n"
-    "Enter     Apply rename"
-)
-
 STYLESHEET = b"""
   .title-1 { color: #19c322; font-size: 38px; font-weight: 800; }
   .old-name { color: #20b8c2; font-size: 25px; }
@@ -302,10 +284,10 @@ class OmniRename(Adw.Application):
         box = padded_box(20, 10)
         box.set_margin_start(24)
         box.set_margin_end(24)
-        title = Gtk.Label(label="Backtick command shortcuts", xalign=0)
+        title = Gtk.Label(label=f"Commands (hold {self.session.command_key})", xalign=0)
         title.add_css_class("title-2")
         box.append(title)
-        label = Gtk.Label(label=SHORTCUTS, xalign=0)
+        label = Gtk.Label(label=self.session.cheat_sheet, xalign=0)
         label.set_selectable(True)
         label.add_css_class("monospace")
         box.append(label)

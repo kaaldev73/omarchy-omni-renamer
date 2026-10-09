@@ -29,7 +29,7 @@ _Avoid_: recommendation, AI name
 ### Commands
 
 **Command Mode**:
-The state that lasts while backtick is held down, like a modifier key; keys typed meanwhile form a Command instead of text, and releasing backtick ends it.
+The state that lasts while the Command Mode key (backtick unless configured otherwise) is held down, like a modifier key; keys typed meanwhile form a Command instead of text, and releasing the key ends it.
 _Avoid_: leader mode, magic mode
 
 **Command**:

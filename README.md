@@ -52,6 +52,22 @@ in a standard Omarchy installation.
    same Preview, and only a Safe Preview is renamed.
 6. Reopen OmniRename on renamed items and use `` `u `` to restore their names.
 
+### Command Mode key
+
+Commands are typed while holding backtick; tapping it alone types a literal
+backtick. If backtick is a dead key on your keyboard layout, choose another key
+in `~/.config/OmniRename/settings.json` (or under `$XDG_CONFIG_HOME`):
+
+```json
+{ "command_key": "#" }
+```
+
+The value is the single character the key types. Choose a key typed without
+Shift or AltGr (on German layouts `#` or `<`), since a held modifier changes the
+digits typed in Commands, and not a dead key. It cannot be a letter, digit,
+space or `?`, because those appear in Commands. A missing, unreadable or invalid
+setting falls back to backtick. The cheat sheet (`?` Command) shows the key in use.
+
 Suggestions in the window are local and deterministic; nothing is sent to an
 agent. The optional Codex agent (`omni_agent.py`) runs ephemerally with a
 read-only sandbox and a strict JSON response schema, shares only filenames and

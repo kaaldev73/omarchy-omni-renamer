@@ -392,6 +392,10 @@ class CommandModeTests(SessionTestCase):
         self.command(session, "?")
         self.assertEqual(session.take_requests(), [("open", "shortcuts")])
 
+    def test_cheat_sheet_shows_backtick_by_default(self):
+        session = self.session_for("notes.txt")
+        self.assertIn("` + S     Cycle filename style", session.cheat_sheet)
+
     def test_revert_clears_every_rule(self):
         session = self.session_for("notes.txt")
         self.command(session, "1")
@@ -403,6 +407,86 @@ class CommandModeTests(SessionTestCase):
         self.assertEqual(session.new_name, "notes.txt")
         self.assertEqual(session.visible_pills, ["name"])
         self.assertEqual(session.status, "Original name restored")
+
+
+class CommandKeySettingTests(SessionTestCase):
+    def write_settings(self, text):
+        folder = self.root / "config" / "OmniRename"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "settings.json").write_text(text, encoding="utf-8")
+
+    def test_configured_key_holds_command_mode(self):
+        self.write_settings('{"command_key": "§"}')
+        session = self.session_for("notes.txt")
+        self.assertTrue(session.key_down("section", "§"))
+        session.key_down("section", "§")
+        session.key_down("s", "s")
+        session.key_up("s")
+        self.assertEqual(session.status, "⌁ Command: § + s")
+        session.key_up("section")
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def test_configured_key_tapped_alone_inserts_itself(self):
+        self.write_settings('{"command_key": "§"}')
+        session = self.session_for("notes.txt")
+        session.key_down("section", "§")
+        session.key_up("section")
+        self.assertEqual(session.take_requests(), [("insert_text", "§")])
+
+    def test_backtick_is_ordinary_text_when_another_key_is_configured(self):
+        self.write_settings('{"command_key": "§"}')
+        session = self.session_for("notes.txt")
+        self.assertFalse(session.key_down("grave", "`"))
+        self.assertFalse(session.key_down("dead_grave", "`"))
+        session.key_up("grave")
+        self.assertEqual(session.take_requests(), [])
+        self.assertFalse(session.key_down("s", "s"))
+
+    def test_configured_key_released_by_keycode_after_its_name_changes(self):
+        self.write_settings('{"command_key": "#"}')
+        session = self.session_for("notes.txt")
+        session.key_down("numbersign", "#", code=51)
+        session.key_down("4", "4", code=13)
+        session.key_down("4", "4", code=13)
+        session.key_up("4", code=13)
+        session.key_up("apostrophe", code=51)
+        self.assertEqual(session.new_name, "20240309-notes.txt")
+
+    def test_non_ascii_letter_can_be_the_configured_key(self):
+        self.write_settings('{"command_key": "ß"}')
+        session = self.session_for("notes.txt")
+        self.command_with(session, "ssharp", "ß", "s")
+        self.assertEqual(session.status, "Style: snake_case")
+
+    def command_with(self, session, key, char, code):
+        session.key_down(key, char)
+        for typed in code:
+            session.key_down(typed, typed)
+            session.key_up(typed)
+        session.key_up(key)
+
+    def test_cheat_sheet_shows_the_configured_key(self):
+        self.write_settings('{"command_key": "§"}')
+        session = self.session_for("notes.txt")
+        self.assertIn("§ + S     Cycle filename style", session.cheat_sheet)
+        self.assertNotIn("`", session.cheat_sheet)
+
+    def test_invalid_settings_fall_back_to_backtick(self):
+        for text in ("{not json", "[]", '{"command_key": 5}', '{"command_key": "ab"}',
+                     '{"command_key": ""}', '{"command_key": " "}', '{"command_key": "s"}',
+                     '{"command_key": "2"}', '{"command_key": "?"}', '{"other": "§"}'):
+            with self.subTest(text=text):
+                self.write_settings(text)
+                session = self.session_for("Quarterly Report.txt")
+                self.command(session, "s")
+                self.assertEqual(session.new_name, "quarterly_report.txt")
+                self.assertIn("` + S", session.cheat_sheet)
+
+    def test_unreadable_settings_fall_back_to_backtick(self):
+        (self.root / "config" / "OmniRename" / "settings.json").mkdir(parents=True)
+        session = self.session_for("Quarterly Report.txt")
+        self.command(session, "s")
+        self.assertEqual(session.new_name, "quarterly_report.txt")
 
 
 if __name__ == "__main__":
