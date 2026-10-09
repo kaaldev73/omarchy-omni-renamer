@@ -1,0 +1,11 @@
+/* OmniRename stylesheet. Colours come only from the theme palette (--omni-*,
+   see omni_theme.py) or from libadwaita's variables, which the palette recolours. */
+
+.title-1 { font-size: 38px; font-weight: 800; }
+.old-name { color: var(--omni-muted); font-size: 25px; }
+.new-name { color: var(--accent-color); font-size: 39px; font-weight: 600; }
+.pill { border: none; border-radius: 24px; padding: 10px 22px; font-size: 17px; }
+.pill-entry { border: none; border-radius: 24px; padding: 10px 16px; min-width: 150px; }
+.muted { color: var(--omni-muted); }
+list > row:selected { background-color: var(--omni-selection); }
+list > row:hover { background-color: color-mix(in srgb, var(--omni-selection) 60%, transparent); }

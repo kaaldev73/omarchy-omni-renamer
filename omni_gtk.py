@@ -13,15 +13,9 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk
 
 from omni_session import RenameSession
+from omni_theme import load_theme, theme_css
 
-STYLESHEET = b"""
-  .title-1 { color: #19c322; font-size: 38px; font-weight: 800; }
-  .old-name { color: #20b8c2; font-size: 25px; }
-  .new-name { color: #b6ef19; font-size: 39px; font-weight: 600; }
-  .pill { border: 2px solid #16c62a; border-radius: 24px; padding: 10px 22px; font-size: 17px; }
-  .pill-entry { border: 2px solid #16c62a; border-radius: 24px; padding: 10px 16px; min-width: 150px; }
-  .dim-label { color: #aaa; }
-"""
+STYLESHEET_FILE = Path(__file__).resolve().parent / "omni.css"
 
 
 def padded_box(margin: int, spacing: int) -> Gtk.Box:
@@ -81,7 +75,7 @@ class OmniRename(Adw.Application):
         root.append(self.new_preview)
 
         self.detail = Gtk.Label(halign=Gtk.Align.CENTER)
-        self.detail.add_css_class("dim-label")
+        self.detail.add_css_class("muted")
         root.append(self.detail)
 
         self.editor = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -118,8 +112,12 @@ class OmniRename(Adw.Application):
         return entry
 
     def add_css(self):
+        """Style every window, dialogs included, from the current Omarchy theme."""
+        theme = load_theme()
+        scheme = {"light": Adw.ColorScheme.FORCE_LIGHT, "dark": Adw.ColorScheme.FORCE_DARK}
+        Adw.StyleManager.get_default().set_color_scheme(scheme.get(theme.mode, Adw.ColorScheme.DEFAULT))
         provider = Gtk.CssProvider()
-        provider.load_from_data(STYLESHEET)
+        provider.load_from_string(theme_css(theme) + STYLESHEET_FILE.read_text(encoding="utf-8"))
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
