@@ -157,6 +157,129 @@ class NamePartCommandTests(SessionTestCase):
         self.assertEqual(session.new_name, "final-notes.txt")
 
 
+class PillTests(SessionTestCase):
+    def test_only_the_name_pill_shows_at_first(self):
+        session = self.session_for("notes.txt")
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_date_pill_follows_every_date_format_and_its_removal(self):
+        session = self.session_for("notes.txt")
+        for code in ("4", "4c2", "4c3"):
+            self.command(session, code)
+            self.assertEqual(session.visible_pills, ["date", "name"], code)
+        self.command(session, "4x")
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_date_pill_follows_the_date_editor(self):
+        session = self.session_for("notes.txt")
+        session.set_date("%Y", True)
+        self.assertEqual(session.visible_pills, ["date", "name"])
+        session.set_date("%Y", False)
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_number_pill_follows_numbering_and_its_removal(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "5")
+        self.assertEqual(session.visible_pills, ["name", "number"])
+        self.command(session, "5c734")
+        self.assertEqual(session.visible_pills, ["name", "number"])
+        self.command(session, "5x")
+        self.assertEqual(session.visible_pills, ["name"])
+        session.set_number(True)
+        self.assertEqual(session.visible_pills, ["name", "number"])
+
+    def test_prefix_and_suffix_pills_show_when_they_have_text(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        session.set_suffix("final")
+        self.assertEqual(session.visible_pills, ["prefix", "name", "suffix"])
+        self.command(session, "1x")
+        self.command(session, "3x")
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_empty_prefix_and_suffix_pills_hide_after_the_next_command(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "1")
+        session.set_prefix("client")
+        session.set_prefix("")
+        self.command(session, "3")
+        self.assertEqual(session.visible_pills, ["name", "suffix"])
+        self.command(session, "s")
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_pills_follow_the_prefix_and_date_order(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        self.command(session, "4")
+        self.assertEqual(session.visible_pills, ["date", "prefix", "name"])
+        for code, expected in (
+            ("14", ["prefix", "date", "name"]),
+            ("41", ["date", "prefix", "name"]),
+            ("31", ["prefix", "date", "name"]),
+            ("13", ["date", "prefix", "name"]),
+        ):
+            self.command(session, code)
+            self.assertEqual(session.visible_pills, expected, code)
+
+    def test_pills_follow_the_number_and_suffix_order(self):
+        session = self.session_for("notes.txt")
+        session.set_suffix("final")
+        self.command(session, "5")
+        self.assertEqual(session.visible_pills, ["name", "suffix", "number"])
+        self.command(session, "35")
+        self.assertEqual(session.visible_pills, ["name", "number", "suffix"])
+        self.command(session, "53")
+        self.assertEqual(session.visible_pills, ["name", "suffix", "number"])
+
+    def test_preset_shows_every_pill_it_uses(self):
+        session = self.session_for("notes.txt")
+        session.set_prefix("client")
+        session.set_suffix("final")
+        self.command(session, "4")
+        self.command(session, "5")
+        session.save_preset("Everything")
+
+        fresh = self.session_for("other.txt")
+        self.command(fresh, "e")
+        self.assertEqual(fresh.visible_pills, ["date", "prefix", "name", "suffix", "number"])
+
+    def test_preset_without_optional_parts_hides_their_pills(self):
+        session = self.session_for("notes.txt")
+        session.save_preset("Plain")
+
+        fresh = self.session_for("other.txt")
+        self.command(fresh, "1")
+        self.command(fresh, "3")
+        fresh.set_suffix("final")
+        self.command(fresh, "4")
+        self.command(fresh, "5")
+        self.command(fresh, "e")
+        self.assertEqual(fresh.visible_pills, ["name"])
+
+    def test_revert_hides_every_optional_pill(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "1")
+        session.set_prefix("client")
+        self.command(session, "3")
+        session.set_suffix("final")
+        self.command(session, "4")
+        self.command(session, "5")
+        session.revert()
+        self.assertEqual(session.visible_pills, ["name"])
+
+    def test_pill_steps_move_only_through_visible_pills(self):
+        session = self.session_for("notes.txt")
+        self.command(session, "4")
+        self.command(session, "5")
+        self.assertEqual(session.pill_step("name", 1), "number")
+        self.assertEqual(session.pill_step("number", 1), "date")
+        self.assertEqual(session.pill_step("date", -1), "number")
+        self.assertEqual(session.pill_step(None, 1), "number")
+        self.command(session, "4x")
+        self.assertEqual(session.pill_step("name", -1), "number")
+        self.assertEqual(session.pill_step("date", 1), "number")
+
+
 class SuggestionCommandTests(SessionTestCase):
     def test_suggestion_replaces_the_preview_and_can_be_removed(self):
         session = self.session_for("IMG 0001.txt")

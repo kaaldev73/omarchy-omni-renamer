@@ -108,8 +108,8 @@ class RenameSession:
         self.date_token = ""
         self.prefix_before_date = False
         self.suggested_names: list[str] | None = None
-        self.prefix_shown = False
-        self.suffix_shown = False
+        self.prefix_editing = False
+        self.suffix_editing = False
         self.editor: str | None = None
         self.status = "Press a pill to edit that part of the filename"
         self.rows: list[dict] = []
@@ -148,13 +148,24 @@ class RenameSession:
 
     @property
     def visible_pills(self) -> list[str]:
-        pills = []
-        if self.prefix_shown:
-            pills.append("prefix")
-        pills.append("name")
-        if self.suffix_shown:
-            pills.append("suffix")
-        return pills
+        """The Pills of the Name Parts in use, in the order they appear in the name.
+
+        Prefix and Suffix also show while empty right after their editor opens,
+        until the next Command.
+        """
+        prefix = ["prefix"] if self.prefix or self.prefix_editing else []
+        date = ["date"] if self.date_token else []
+        suffix = ["suffix"] if self.suffix or self.suffix_editing else []
+        number = ["number"] if self.options["counter_start"] is not None else []
+        before = prefix + date if self.prefix_before_date else date + prefix
+        after = number + suffix if self.options["counter_position"] == "before_suffix" else suffix + number
+        return before + ["name"] + after
+
+    def pill_step(self, current: str | None, step: int) -> str:
+        """The visible Pill `step` places from `current`; a hidden or unknown `current` counts as the Name Pill."""
+        pills = self.visible_pills
+        index = pills.index(current if current in pills else "name")
+        return pills[(index + step) % len(pills)]
 
     @property
     def cheat_sheet(self) -> str:
@@ -291,11 +302,12 @@ class RenameSession:
     def run_command(self, command: str) -> None:
         """Run one Command code."""
         self.status = "Command: " + self.command_key + " + " + command
+        self.prefix_editing = False
+        self.suffix_editing = False
         if command == "1":
             self.show_editor("prefix")
         elif command == "1x":
             self.prefix = ""
-            self.prefix_shown = False
             self.options["prefixes"] = []
             self.preview()
         elif command in ("31", "14"):
@@ -312,7 +324,6 @@ class RenameSession:
             self.show_editor("suffix")
         elif command == "3x":
             self.suffix = ""
-            self.suffix_shown = False
             self.options["suffixes"] = []
             self.preview()
         elif command == "53":
@@ -366,10 +377,10 @@ class RenameSession:
         self.editor_opened += 1
         self.status = EDITOR_HINTS.get(key, self.status)
         if key == "prefix":
-            self.prefix_shown = True
+            self.prefix_editing = True
             self._requests.append(("focus", "prefix"))
         elif key == "suffix":
-            self.suffix_shown = True
+            self.suffix_editing = True
             self._requests.append(("focus", "suffix"))
         elif key == "replace":
             self._requests.append(("focus", "find"))
@@ -421,8 +432,8 @@ class RenameSession:
         self.prefix = next((x for x in prefixes if x != self.date_token), "")
         suffixes = list(loaded.get("suffixes", []))
         self.suffix = suffixes[0] if suffixes else ""
-        self.prefix_shown = bool(self.prefix)
-        self.suffix_shown = bool(self.suffix)
+        self.prefix_editing = False
+        self.suffix_editing = False
         loaded_name = str(self.options.get("name", ""))
         if loaded_name != self.name:
             self.suggested_names = None
@@ -506,8 +517,8 @@ class RenameSession:
         self.name = ""
         self.prefix = ""
         self.suffix = ""
-        self.prefix_shown = False
-        self.suffix_shown = False
+        self.prefix_editing = False
+        self.suffix_editing = False
         self.options.update({"name": "", "prefixes": [], "suffixes": [], "counter_start": None, "find": "", "replace": ""})
         self.date_token = ""
         self.suggested_names = None

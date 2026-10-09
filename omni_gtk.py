@@ -59,16 +59,22 @@ class OmniRename(Adw.Application):
         old.add_css_class("old-name")
         root.append(old)
 
-        pills = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER)
+        self.pills = Gtk.Box(spacing=10, halign=Gtk.Align.CENTER)
         self.date_button = self.pill_button("Date", "date")
         self.prefix_entry = self.pill_entry("Prefix", 8, self.session.set_prefix)
         self.name_entry = self.pill_entry("New Name", 12, self.session.set_name)
         self.suffix_entry = self.pill_entry("Suffix", 8, self.session.set_suffix)
         self.number_button = self.pill_button("Number", "number")
-        self.pill_controls = [self.date_button, self.prefix_entry, self.name_entry, self.suffix_entry, self.number_button]
-        for control in self.pill_controls:
-            pills.append(control)
-        root.append(pills)
+        self.pill_controls = {
+            "date": self.date_button,
+            "prefix": self.prefix_entry,
+            "name": self.name_entry,
+            "suffix": self.suffix_entry,
+            "number": self.number_button,
+        }
+        for control in self.pill_controls.values():
+            self.pills.append(control)
+        root.append(self.pills)
 
         self.new_preview = Gtk.Label()
         self.new_preview.add_css_class("new-name")
@@ -152,9 +158,7 @@ class OmniRename(Adw.Application):
                 entry.set_text(text)
         self.syncing = False
 
-        visible = session.visible_pills
-        self.prefix_entry.set_visible("prefix" in visible)
-        self.suffix_entry.set_visible("suffix" in visible)
+        self.sync_pills(session.visible_pills)
         self.new_preview.set_text(session.new_name)
         self.detail.set_text(session.status)
         if session.editor_opened != self.rendered_editor:
@@ -169,6 +173,16 @@ class OmniRename(Adw.Application):
 
         for request in session.take_requests():
             self.handle(request)
+
+    def sync_pills(self, visible: list[str]):
+        """Show exactly the visible Pills, in their order."""
+        previous = None
+        for name in visible:
+            control = self.pill_controls[name]
+            self.pills.reorder_child_after(control, previous)
+            previous = control
+        for name, control in self.pill_controls.items():
+            control.set_visible(name in visible)
 
     def preview_row(self, row: dict) -> Gtk.Label:
         label = Gtk.Label(label=f'{row["original"]}  →  {row["renamed"]}', xalign=0)
@@ -206,12 +220,7 @@ class OmniRename(Adw.Application):
     def handle(self, request: tuple):
         kind = request[0]
         if kind == "focus":
-            target = {
-                "prefix": self.prefix_entry,
-                "name": self.name_entry,
-                "suffix": self.suffix_entry,
-                "find": self.find_entry,
-            }.get(request[1])
+            target = self.find_entry if request[1] == "find" else self.pill_controls.get(request[1])
             if target is not None:
                 target.grab_focus()
         elif kind == "focus_step":
@@ -229,10 +238,18 @@ class OmniRename(Adw.Application):
             }[request[1]]()
 
     def step_focus(self, step: int):
-        controls = [control for control in self.pill_controls if control.get_visible()]
+        target = self.session.pill_step(self.focused_pill(), step)
+        self.pill_controls[target].grab_focus()
+
+    def focused_pill(self) -> str | None:
+        """The Pill holding keyboard focus; an entry's focus sits on its inner text widget."""
         focused = self.win.get_focus()
-        current = controls.index(focused) if focused in controls else 0
-        controls[(current + step) % len(controls)].grab_focus()
+        for name, control in self.pill_controls.items():
+            if focused is control:
+                return name
+            if focused is not None and focused.is_ancestor(control):
+                return name
+        return None
 
     def insert_text(self, text: str):
         field = self.win.get_focus()
