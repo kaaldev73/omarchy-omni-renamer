@@ -104,9 +104,9 @@ def main():
         "kebab-case", "PascalCase", "snake_case", "camelCase", "UPPERCASE", "lowercase", "Title Case", "Sentence case"
     ], state="readonly").pack(pady=4)
 
-    # Prefix UI
+    # Date boxes
     tk.Label(root, text="Prefix Options:", bg="#F0F0F0", font=("Segoe UI", 9, "bold")).pack()
-    prefixes = {}
+    date_boxes = {}
     for label in ["yyyymmdd", "yyyymm", "yyyy"]:
         f = tk.Frame(root, bg="#F0F0F0")
         var = tk.BooleanVar()
@@ -115,11 +115,11 @@ def main():
         entry.pack(side="right")
         f.pack(pady=1)
         entry.insert(0, date.today().strftime(DATE_ENTRY_FORMATS[label]))
-        prefixes[label] = (var, entry)
+        date_boxes[label] = (var, entry)
 
-    # Suffix UI
+    # Version and Initials boxes
     tk.Label(root, text="Suffix Options:", bg="#F0F0F0", font=("Segoe UI", 9, "bold")).pack()
-    suffixes = {}
+    version_and_initials_boxes = {}
     for label in ["v", "initials"]:
         f = tk.Frame(root, bg="#F0F0F0")
         var = tk.BooleanVar()
@@ -127,29 +127,29 @@ def main():
         tk.Checkbutton(f, text=label, variable=var, bg="#F0F0F0").pack(side="left")
         entry.pack(side="right")
         f.pack(pady=1)
-        suffixes[label] = (var, entry)
+        version_and_initials_boxes[label] = (var, entry)
 
     # At most one Date: ticking one date box unticks the others
     def keep_one_date(chosen):
-        if prefixes[chosen][0].get():
-            for label, (var, entry) in prefixes.items():
+        if date_boxes[chosen][0].get():
+            for label, (var, entry) in date_boxes.items():
                 if label != chosen:
                     var.set(False)
 
-    for label, (var, entry) in prefixes.items():
+    for label, (var, entry) in date_boxes.items():
         var.trace_add("write", lambda *args, label=label: keep_one_date(label))
 
-    def ticked(boxes, label):
+    def typed_if_ticked(boxes, label):
         var, entry = boxes[label]
         return entry.get().strip() if var.get() else None
 
     def get_choices():
-        dates = [ticked(prefixes, label) for label in prefixes if prefixes[label][0].get()]
+        dates = [typed_if_ticked(date_boxes, label) for label in date_boxes if date_boxes[label][0].get()]
         return Choices(
             style_var.get(),
             date=dates[0] if dates else None,
-            version=ticked(suffixes, "v"),
-            initials=ticked(suffixes, "initials") or None,
+            version=typed_if_ticked(version_and_initials_boxes, "v"),
+            initials=typed_if_ticked(version_and_initials_boxes, "initials") or None,
         )
 
     # Buttons
