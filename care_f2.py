@@ -50,9 +50,8 @@ def main() -> int:
     if not paths:
         forward_f2()
         return 0
-    payload = json.dumps({"paths": paths}, ensure_ascii=False)
     plugin_dir = Path(__file__).resolve().parent
-    subprocess.Popen(["python", str(plugin_dir / "omni_gtk.py"), payload])
+    subprocess.Popen(["python", str(plugin_dir / "omni_care.py"), *paths])
     return 0
 
 

@@ -1,6 +1,6 @@
 # OmniRename
 
-A keyboard-driven, preview-first batch renamer that takes over `F2` in Omarchy's file manager and renames the selected files and folders safely.
+A batch renamer that takes over `F2` in Omarchy's file manager: it applies a Style, an optional prefix and suffix to the selected files and folders, and can undo the rename.
 
 ## Language
 
