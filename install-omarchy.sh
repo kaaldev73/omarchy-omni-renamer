@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-plugin_id="io.github.omnirename.omarchy"
+plugin_id="io.github.kaaldev73.omarchy-omni-renamer"
 plugin_dir="$HOME/.config/omarchy/plugins/$plugin_id"
 bindings="$HOME/.config/hypr/bindings.lua"
 start_marker="-- OmniRename integration: start"

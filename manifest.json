@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.omnirename.omarchy",
+  "id": "io.github.kaaldev73.omarchy-omni-renamer",
   "name": "OmniRename",
   "version": "2.0.0",
-  "author": "OmniRename",
+  "author": "Kaaldev",
   "description": "Safe, preview-first batch renaming integrated with Omarchy and Nautilus",
   "kinds": ["service"],
   "entryPoints": {

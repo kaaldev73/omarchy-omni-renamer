@@ -23,16 +23,23 @@ keeps its normal behaviour everywhere.
 
 ## Install
 
+OmniRename needs `tk` for its window, which a standard Omarchy installation does
+not include. Its other dependencies, `python` and `wl-clipboard`, are already
+there.
+
 ```bash
+sudo pacman -S --needed tk
 omarchy plugin add https://github.com/kaaldev73/omarchy-omni-renamer.git --enable
-~/.config/omarchy/plugins/io.github.omnirename.omarchy/install-omarchy.sh
+~/.config/omarchy/plugins/io.github.kaaldev73.omarchy-omni-renamer/install-omarchy.sh
 ```
 
-The installer backs up `~/.config/hypr/bindings.lua` on first install, adds one
-contextual `Alt+S` binding (replacing the `F2` one from earlier versions), adds
-a window rule so the window floats centred, rescans the Omarchy shell, reloads
-Hyprland, and checks for configuration errors. Its dependencies, `python` and
-`wl-clipboard`, come with a standard Omarchy installation.
+Adding the plugin, from the command line or the Omarchy plugin marketplace, only
+copies its files. The last command is what makes `Alt+S` work, and it is the
+only step that changes your configuration: it backs up
+`~/.config/hypr/bindings.lua` on first install, adds one contextual `Alt+S`
+binding (replacing the `F2` one from earlier versions), adds a window rule so
+the window floats centred, rescans the Omarchy shell, reloads Hyprland, and
+checks for configuration errors.
 
 ## Rename
 
@@ -145,8 +152,7 @@ git.
 
 ## Remove
 
-Run `uninstall-omarchy.sh`, then:
-
 ```bash
-omarchy plugin remove io.github.omnirename.omarchy
+~/.config/omarchy/plugins/io.github.kaaldev73.omarchy-omni-renamer/uninstall-omarchy.sh
+omarchy plugin remove io.github.kaaldev73.omarchy-omni-renamer
 ```
