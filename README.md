@@ -37,8 +37,9 @@ Omarchy installation.
 
 1. Select one or more local files or folders in Nautilus.
 2. Press `Alt+S` to open the OmniRename window.
-3. Type a new Name if you want one (the grey text is the current Name, kept
-   when the box is left empty), choose a Style, then tick a Date, Version or
+3. With one item selected, type a new Name if you want one (the grey text is
+   the current Name, kept when the box is left empty; with several items each
+   keeps its own Name and the box is hidden). Choose a Style, then tick a Date, Version or
    Initials and adjust its value.
 4. Press **Rename**. **Undo Rename** restores the original names of the files
    the window was opened on. The result shows at the bottom of the window;

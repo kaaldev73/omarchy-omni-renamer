@@ -116,7 +116,7 @@ def guide_examples(day):
 
 GUIDE_PARTS = [
     ("Date", "yyyymmdd, yyyymm or yyyy, always first"),
-    ("Name", "what the item is; shaped by the Style"),
+    ("Name", "what the item is; shaped by the Style, and typed only for one item at a time"),
     ("Version", "v and a number; an empty box bumps it"),
     ("Initials", "who made it, kept exactly as typed"),
 ]
@@ -174,7 +174,7 @@ def build_guide(parent, palette):
 HELP_RENAME = [
     "Select one or more files or folders in Nautilus",
     "Press Alt+S to open this window",
-    "Type a new Name if you want one, choose a Style, and tick a Date, Version or Initials",
+    "Type a new Name if you want one (the Name box shows only when one item is selected), choose a Style, and tick a Date, Version or Initials",
     "Press Rename (or Enter); the window closes after 3 seconds",
 ]
 
@@ -291,15 +291,17 @@ def main():
         row += 1
         return var, entry
 
-    heading("Name", top=0)
+    # The Name box is for one item only; several items always keep their own Names.
+    # The current Name shows as a grey placeholder; leaving the box empty keeps it.
+    one_item = len(current_paths) == 1
     name_entry = ttk.Entry(form, font=(FONT, 10))
-    name_entry.grid(row=row, column=0, columnspan=2, sticky="ew")
-    row += 1
-    # The current Name shows as a grey placeholder; leaving the box empty keeps it
+    if one_item:
+        heading("Name", top=0)
+        name_entry.grid(row=row, column=0, columnspan=2, sticky="ew")
+        row += 1
+
     def current_name():
-        if len(current_paths) == 1:
-            return existing_name(os.path.basename(current_paths[0]))
-        return "Keep each item's name"
+        return existing_name(os.path.basename(current_paths[0])) if one_item else ""
 
     placeholder = current_name()
     showing_placeholder = True
@@ -329,7 +331,7 @@ def main():
     name_entry.bind("<FocusOut>", show_placeholder)
     show_placeholder()
 
-    heading("Style")
+    heading("Style", top=12 if one_item else 0)
     style_var = tk.StringVar(value="kebab-case")
     ttk.Combobox(form, textvariable=style_var, values=STYLES, state="readonly", font=(FONT, 10)).grid(
         row=row, column=0, columnspan=2, sticky="ew")

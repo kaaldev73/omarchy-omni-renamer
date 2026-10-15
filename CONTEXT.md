@@ -15,7 +15,7 @@ The Name Part saying when the item is from, as yyyymmdd, yyyymm or yyyy; today u
 _Avoid_: timestamp
 
 **Name**:
-The Name Part saying what the item is; kept from the current name unless a new one is typed, and always shaped by the Style.
+The Name Part saying what the item is; kept from the current name unless a new one is typed for a single item, and always shaped by the Style.
 _Avoid_: title, base name
 
 **Version**:
