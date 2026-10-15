@@ -41,8 +41,9 @@ Omarchy installation.
    the current Name, kept when the box is left empty; with several items each
    keeps its own Name and the box is hidden). Choose a Style, then tick a Date, Version or
    Initials and adjust its value.
-4. Press **Rename**. **Undo Rename** restores the original names of the files
-   the window was opened on. The result shows at the bottom of the window;
+4. Press **Rename**. **Undo Rename** opens the History of the items the window
+   was opened on: with one item, click any earlier name to restore it; with
+   several, **Undo last rename** steps each one back once. The result shows at the bottom of the window;
    **Show all** lists every item when there are several. After a successful
    rename the window closes by itself after 3 seconds, unless you use **Show
    all** or **Undo Rename** first. `Escape` closes the window.

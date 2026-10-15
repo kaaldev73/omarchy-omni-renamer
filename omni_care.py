@@ -98,9 +98,37 @@ def rename_selected(choices):
     update_current_paths(moves)
     return rename_report(moves)
 
+def name_chain(path, originals):
+    """Every name path has had, newest first, following the history {new: old}."""
+    chain = [str(path)]
+    while chain[-1] in originals and originals[chain[-1]] not in chain:
+        chain.append(originals[chain[-1]])
+    return chain
+
+def restore(path, earlier, history=None):
+    """Step path back through its history to an earlier name; return {old path: new path}."""
+    history = history or default_history()
+    chain = name_chain(path, history.load())
+    earlier = str(earlier)
+    if earlier not in chain[1:]:
+        raise RenameError(f"{os.path.basename(earlier)} is not an earlier name of {os.path.basename(str(path))}")
+    if os.path.lexists(earlier):
+        raise RenameError(f"Cannot restore {os.path.basename(earlier)}: an item with that name exists")
+    for current in chain[:chain.index(earlier)]:
+        RenameTransaction(history).undo([current])
+    return {str(path): earlier}
+
 def undo_selected():
     try:
         moves = undo(current_paths)
+    except RenameError as error:
+        return problem_report(error)
+    update_current_paths(moves)
+    return undo_report(moves)
+
+def restore_selected(path, earlier):
+    try:
+        moves = restore(path, earlier)
     except RenameError as error:
         return problem_report(error)
     update_current_paths(moves)
@@ -154,6 +182,44 @@ class Panel:
             row=self.row, column=1, sticky="w", pady=1)
         self.row += 1
 
+    def link(self, left, text, command):
+        ttk.Label(self.frame, text=left, foreground=self.palette["muted"], font=(FONT, 9)).grid(
+            row=self.row, column=0, sticky="nw", padx=(0, 14), pady=1)
+        tk.Button(self.frame, text=text, command=command, relief="flat", borderwidth=0,
+                  highlightthickness=0, cursor="hand2", padx=0, pady=0, font=(FONT, 9, "underline"),
+                  bg=self.palette["background"], fg=self.palette["accent"],
+                  activebackground=self.palette["background"],
+                  activeforeground=self.palette["foreground"]).grid(row=self.row, column=1, sticky="w", pady=1)
+        self.row += 1
+
+def build_history(parent, palette, paths, on_restore, on_undo_last):
+    """Every earlier name of the selected items; one item can jump to any of them."""
+    originals = default_history().load()
+    chains = [name_chain(path, originals) for path in paths]
+    panel = Panel(parent, palette)
+    panel.heading("History")
+    if not any(len(chain) > 1 for chain in chains):
+        panel.text("No renames recorded for these items.")
+    elif len(chains) == 1:
+        chain = chains[0]
+        panel.text("Click an earlier name to restore it.")
+        for index, name in enumerate(chain):
+            label = "now" if index == 0 else "original" if index == len(chain) - 1 else ""
+            if index == 0:
+                panel.line(label, os.path.basename(name))
+            else:
+                panel.link(label, os.path.basename(name), lambda name=name: on_restore(chain[0], name))
+    else:
+        panel.text("Newest first. Select one item to jump further back.")
+        for chain in chains:
+            panel.line("", " ← ".join(os.path.basename(name) for name in chain))
+    if any(len(chain) > 1 for chain in chains):
+        ttk.Button(panel.frame, text="Undo last rename", style="Undo.TButton", command=on_undo_last).grid(
+            row=panel.row, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        panel.row += 1
+    panel.text("Escape goes back.")
+    return panel.frame
+
 def build_guide(parent, palette):
     """The naming structure, an example in every Style, and the folder rule."""
     panel = Panel(parent, palette)
@@ -181,7 +247,8 @@ HELP_RENAME = [
 HELP_UNDO = [
     "Select the renamed files or folders in Nautilus",
     "Press Alt+S",
-    "Press Undo Rename; they get their original names back",
+    "Press Undo Rename to see their History",
+    "One item: click any earlier name to restore it. Several: Undo last rename steps each back once",
 ]
 
 HELP_KEYS = [("Enter", "Rename"), ("Escape", "close this page, or the window"), ("?", "this page")]
@@ -258,6 +325,15 @@ def main():
 
     def toggle_page(name):
         nonlocal open_page
+        if name == "history" and open_page != "history":
+            try:
+                page = build_history(root, palette, current_paths, restore_and_show, undo_and_show)
+            except RenameError as error:
+                show(problem_report(error))
+                return
+            if "history" in pages:
+                pages["history"].destroy()
+            pages["history"] = page
         (pages[open_page] if open_page else form).pack_forget()
         open_page = None if open_page == name else name
         (pages[open_page] if open_page else form).pack(fill="both", expand=True)
@@ -434,8 +510,17 @@ def main():
     status_row = row
     ttk.Button(buttons, text="Rename", style="Rename.TButton",
                command=rename_and_close).grid(row=0, column=0, sticky="ew")
+    # Undo Rename opens the History page; restoring returns to the form with the result
+    def restore_and_show(path, earlier):
+        toggle_page("history")
+        show(restore_selected(path, earlier))
+
+    def undo_and_show():
+        toggle_page("history")
+        show(undo_selected())
+
     ttk.Button(buttons, text="Undo Rename", style="Undo.TButton",
-               command=lambda: show(undo_selected())).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+               command=lambda: (stay_open(), toggle_page("history"))).grid(row=1, column=0, sticky="ew", pady=(6, 0))
     root.bind("<Return>", lambda event: rename_and_close())
 
     root.mainloop()

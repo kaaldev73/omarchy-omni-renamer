@@ -99,6 +99,34 @@ class RenameTests(unittest.TestCase):
         self.assertIn("Date", str(raised.exception))
         self.assertEqual(source.read_text(), "A")
 
+    def test_the_history_lists_every_earlier_name_newest_first(self):
+        source = self.make("My Report.txt", "A")
+        omni_care.rename([source], Choices("kebab-case"), self.history)
+        renamed = self.folder / "my-report.txt"
+        omni_care.rename([renamed], Choices("kebab-case", version="2"), self.history)
+        newest = self.folder / "my-report-v2.txt"
+
+        chain = omni_care.name_chain(newest, self.history.load())
+
+        self.assertEqual(chain, [str(newest), str(renamed), str(source)])
+
+    def test_restore_jumps_back_several_renames_at_once(self):
+        source = self.make("My Report.txt", "A")
+        omni_care.rename([source], Choices("kebab-case"), self.history)
+        omni_care.rename([self.folder / "my-report.txt"], Choices(version="2"), self.history)
+        newest = self.folder / "my-report-v2.txt"
+
+        moves = omni_care.restore(newest, source, self.history)
+
+        self.assertEqual(moves, {str(newest): str(source)})
+        self.assertEqual(source.read_text(), "A")
+        self.assertEqual(self.history.load(), {})
+
+    def test_a_looping_history_ends_the_chain(self):
+        chain = omni_care.name_chain("/a/x.txt", {"/a/x.txt": "/a/y.txt", "/a/y.txt": "/a/x.txt"})
+
+        self.assertEqual(chain, ["/a/x.txt", "/a/y.txt"])
+
 
 class ReportTests(unittest.TestCase):
     def test_one_rename_is_reported_in_full(self):
