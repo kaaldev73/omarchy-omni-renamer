@@ -12,8 +12,9 @@ if [[ ! -f "$plugin_dir/manifest.json" ]]; then
   exit 1
 fi
 
-# Replace any earlier OmniRename block, including the old F2 one, with the current one
-cp "$bindings" "$bindings.omnirename-backup"
+# Replace any earlier OmniRename block, including the old F2 one, with the current one.
+# The backup is taken once, so reinstalling never overwrites the pre-OmniRename bindings.
+[[ -e "$bindings.omnirename-backup" ]] || cp "$bindings" "$bindings.omnirename-backup"
 temporary="$(mktemp)"
 awk '
   $0 == "-- OmniRename integration: start" || $0 == "-- OmniRename F2 integration: start" { skipping=1; next }
