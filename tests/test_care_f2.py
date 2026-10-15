@@ -23,7 +23,7 @@ class F2AdapterTests(unittest.TestCase):
             care_f2.main()
 
         command = popen.call_args.args[0]
-        self.assertTrue(command[1].endswith("CaRe_1.1.py"))
+        self.assertTrue(command[1].endswith("omni_care.py"))
         self.assertEqual(command[2:], ["/tmp/a.txt"])
 
 

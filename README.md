@@ -1,10 +1,13 @@
 # OmniRename for Omarchy
 
 OmniRename replaces the normal `F2` rename flow in Omarchy's Nautilus file manager
-with a theme-aware, preview-first batch renamer. Outside Nautilus, `F2` is
-forwarded to the focused application unchanged.
+with a small batch renamer. Outside Nautilus, `F2` is forwarded to the focused
+application unchanged.
 
-The UI is a GTK window that `F2` opens on the current Nautilus selection. The
+The UI is a tkinter window (`omni_care.py`, based on the earlier CaRe app) that
+`F2` opens on the current Nautilus selection. The earlier GTK window
+(`omni_gtk.py`) stays in the repository but `F2` no longer opens it; the
+Features list and the Command Mode section below describe that GTK window. The
 Omarchy plugin itself is a thin stub: it declares a do-nothing service so that
 `omarchy plugin add` can install the files, and the install script adds the
 `F2` binding.
@@ -45,12 +48,12 @@ in a standard Omarchy installation.
 
 1. Select one or more local files or folders in Nautilus.
 2. Press `F2` to open the OmniRename window.
-3. Type a base name and use backtick Commands to add a prefix, suffix, date or
-   numbering, change the Style, or load a Preset. `` `/ `` shows the cheat sheet.
-4. Inspect every proposed result in the preview, then press `Enter` to rename.
-5. Optionally use `` `22 `` for contextual name suggestions. They pass through the
-   same Preview, and only a Safe Preview is renamed.
-6. Reopen OmniRename on renamed items and use `` `u `` to restore their names.
+3. Choose a case style, tick any prefix or suffix and type its value.
+4. Press **Rename**. **Undo Rename** restores the original names of the files
+   the window was opened on. `Escape` closes the window.
+
+The rename history is kept in `~/.local/state/omnirename/rename_backlog.json`.
+The window floats centred thanks to a Hyprland window rule the installer adds.
 
 ### Command Mode key
 

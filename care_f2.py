@@ -51,7 +51,7 @@ def main() -> int:
         forward_f2()
         return 0
     plugin_dir = Path(__file__).resolve().parent
-    subprocess.Popen(["python", str(plugin_dir / "CaRe_1.1.py"), *paths])
+    subprocess.Popen(["python", str(plugin_dir / "omni_care.py"), *paths])
     return 0
 
 

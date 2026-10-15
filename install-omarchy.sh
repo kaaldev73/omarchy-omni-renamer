@@ -19,6 +19,7 @@ if ! grep -Fq -- "$start_marker" "$bindings"; then
     printf '%s\n' '-- F2 was previously handled directly by each application.'
     printf '%s\n' '-- OmniRename handles Nautilus selections and forwards F2 everywhere else.'
     printf '%s\n' "o.bind(\"F2\", \"OmniRename / forward F2\", \"python $plugin_dir/care_f2.py\")"
+    printf '%s\n' 'o.window("^Omnirename$", { float = true, center = true })'
     printf '%s\n' "$end_marker"
   } >> "$bindings"
 fi

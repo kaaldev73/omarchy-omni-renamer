@@ -123,25 +123,12 @@ def undo_selected():
         messagebox.showinfo("Nothing Restored", "No match found in backup.")
 
 # GUI
-root = tk.Tk()
-root.title("CaRe - Renamer")
-root.geometry("370x470+1200+700")
+# The window class lets the Hyprland rule float and centre the window
+root = tk.Tk(className="omnirename")
+root.title("OmniRename")
+root.geometry("370x420")
 root.configure(bg="#F0F0F0")
-root.attributes("-topmost", True)
-
-def start_move(event): root.x, root.y = event.x, event.y
-def stop_move(event): root.x, root.y = None, None
-def do_move(event): root.geometry(f"+{root.winfo_x() + (event.x - root.x)}+{root.winfo_y() + (event.y - root.y)}")
-
-# Header
-title_bar = tk.Frame(root, bg="#262626", relief="raised", bd=0)
-title_bar.pack(fill=tk.X)
-tk.Label(title_bar, text="🔁 CaRe - Renamer", bg="#262626", fg="white", font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT, padx=6)
-tk.Button(title_bar, text="–", command=root.iconify, bg="#262626", fg="white", bd=0).pack(side=tk.RIGHT, padx=5)
-tk.Button(title_bar, text="×", command=root.destroy, bg="#262626", fg="white", bd=0).pack(side=tk.RIGHT)
-title_bar.bind("<Button-1>", start_move)
-title_bar.bind("<B1-Motion>", do_move)
-title_bar.bind("<ButtonRelease-1>", stop_move)
+root.bind("<Escape>", lambda event: root.destroy())
 
 # Case style dropdown
 style_var = tk.StringVar(value="kebab-case")
