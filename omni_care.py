@@ -241,7 +241,7 @@ HELP_RENAME = [
     "Select one or more files or folders in Nautilus",
     "Press Alt+S to open this window",
     "Type a new Name if you want one (the Name box shows only when one item is selected), choose a Style, and tick a Date, Version or Initials",
-    "Press Rename (or Enter); Escape or Alt+S closes the window",
+    "Press Rename (or Enter); Escape closes the window",
 ]
 
 HELP_UNDO = [
@@ -251,8 +251,7 @@ HELP_UNDO = [
     "One item: click any earlier name to restore it. Several: Undo last rename steps each back once",
 ]
 
-HELP_KEYS = [("Enter", "Rename"), ("Escape", "close this page, or the window"), ("Alt+S", "close the window"),
-             ("?", "this page")]
+HELP_KEYS = [("Enter", "Rename"), ("Escape", "close this page, or the window"), ("?", "this page")]
 
 def build_help(parent, palette):
     """How to rename, and how to undo a rename."""
@@ -315,9 +314,6 @@ def main():
     root.minsize(320, 1)
     apply_theme(root, palette)
     root.bind("<Escape>", lambda event: toggle_page(open_page) if open_page else root.destroy())
-    # Alt+S opens the window from Nautilus and reaches it here when it is focused
-    for sequence in ("<Alt-s>", "<Alt-S>"):
-        root.bind(sequence, lambda event: root.destroy())
     root.bind("<question>", lambda event: None if isinstance(event.widget, ttk.Entry) else toggle_page("help"))
 
     form = ttk.Frame(root, padding=(18, 14, 18, 16))
