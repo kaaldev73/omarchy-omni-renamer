@@ -676,7 +676,7 @@ class CommandModeTests(SessionTestCase):
 
     def test_cheat_sheet_command(self):
         session = self.session_for("notes.txt")
-        self.command(session, "?")
+        self.command(session, "/")
         self.assertEqual(session.take_requests(), [("open", "shortcuts")])
 
     def test_cheat_sheet_shows_backtick_by_default(self):
@@ -761,7 +761,7 @@ class CommandKeySettingTests(SessionTestCase):
     def test_invalid_settings_fall_back_to_backtick(self):
         for text in ("{not json", "[]", '{"command_key": 5}', '{"command_key": "ab"}',
                      '{"command_key": ""}', '{"command_key": " "}', '{"command_key": "s"}',
-                     '{"command_key": "2"}', '{"command_key": "?"}', '{"other": "§"}'):
+                     '{"command_key": "2"}', '{"command_key": "/"}', '{"other": "§"}'):
             with self.subTest(text=text):
                 self.write_settings(text)
                 session = self.session_for("Quarterly Report.txt")

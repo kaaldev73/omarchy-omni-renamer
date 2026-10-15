@@ -46,7 +46,7 @@ in a standard Omarchy installation.
 1. Select one or more local files or folders in Nautilus.
 2. Press `F2` to open the OmniRename window.
 3. Type a base name and use backtick Commands to add a prefix, suffix, date or
-   numbering, change the Style, or load a Preset. `` `? `` shows the cheat sheet.
+   numbering, change the Style, or load a Preset. `` `/ `` shows the cheat sheet.
 4. Inspect every proposed result in the preview, then press `Enter` to rename.
 5. Optionally use `` `22 `` for contextual name suggestions. They pass through the
    same Preview, and only a Safe Preview is renamed.
@@ -65,8 +65,8 @@ in `~/.config/OmniRename/settings.json` (or under `$XDG_CONFIG_HOME`):
 The value is the single character the key types. Choose a key typed without
 Shift or AltGr (on German layouts `#` or `<`), since a held modifier changes the
 digits typed in Commands, and not a dead key. It cannot be a letter, digit,
-space or `?`, because those appear in Commands. A missing, unreadable or invalid
-setting falls back to backtick. The cheat sheet (`?` Command) shows the key in use.
+space or `/`, because those appear in Commands. A missing, unreadable or invalid
+setting falls back to backtick. The cheat sheet (`/` Command) shows the key in use.
 
 Suggestions in the window are local and deterministic; nothing is sent to an
 agent. The optional Codex agent (`omni_agent.py`) runs ephemerally with a

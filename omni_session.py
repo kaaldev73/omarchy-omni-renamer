@@ -71,7 +71,7 @@ def load_command_key() -> str:
         return DEFAULT_COMMAND_KEY
     if not isinstance(key, str) or len(key) != 1 or not key.isprintable() or key.isspace():
         return DEFAULT_COMMAND_KEY
-    if (key.isascii() and key.isalnum()) or key == "?":
+    if (key.isascii() and key.isalnum()) or key == "/":
         return DEFAULT_COMMAND_KEY
     return key
 
@@ -374,7 +374,7 @@ class RenameSession:
             self._requests.append(("open", "save_preset"))
         elif command == "e":
             self.cycle_preset()
-        elif command == "?":
+        elif command == "/":
             self._requests.append(("open", "shortcuts"))
         elif command == "return":
             self.rename()
