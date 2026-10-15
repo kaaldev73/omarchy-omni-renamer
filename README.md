@@ -18,6 +18,7 @@ install the files, and the install script adds the `Alt+S` binding.
 - A Version without a number bumps the existing one, or starts at `v1`
 - All selected items rename together or none do; nothing is ever overwritten
 - Persistent, atomic undo history
+- Colours from the current Omarchy theme, read each time the window opens
 
 ## Install
 
@@ -36,9 +37,10 @@ Omarchy installation.
 
 1. Select one or more local files or folders in Nautilus.
 2. Press `Alt+S` to open the OmniRename window.
-3. Choose a case style, tick any prefix or suffix and type its value.
+3. Choose a Style, then tick a Date, Version or Initials and adjust its value.
 4. Press **Rename**. **Undo Rename** restores the original names of the files
-   the window was opened on. `Escape` closes the window.
+   the window was opened on. The result shows at the bottom of the window;
+   **Show all** lists every item when there are several. `Escape` closes the window.
 
 The rename history is kept in `~/.local/state/omnirename/rename_backlog.json`.
 The window floats centred thanks to a Hyprland window rule the installer adds.
@@ -52,6 +54,7 @@ omarchy plugin validate .
 
 `omni_care.py` is the window `Alt+S` opens, `name_parts.py` builds each new
 name, and `omni_renamer.py` checks and carries out the renames with undo history.
+`omni_theme.py` turns the Omarchy theme into the window's colours, and
 `omni_dispatch.py` is the contextual shortcut adapter that opens the window.
 `Service.qml` is the do-nothing service stub the plugin manifest declares. The
 earlier QML overlay and theme experiments are kept on the `prototype/*` branches.

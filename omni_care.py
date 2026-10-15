@@ -5,10 +5,11 @@ import sys
 import tkinter as tk
 from pathlib import Path
 from datetime import date
-from tkinter import ttk, messagebox
+from tkinter import ttk
 
 from omni_renamer import RenameError, RenameHistory, RenameTransaction, build_manual_plan
 from name_parts import Choices, choice_problems, propose_name
+from omni_theme import load_palette, mix
 
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")
 BACKUP_FILE = os.path.join(STATE_DIR, "rename_backlog.json")
@@ -51,19 +52,33 @@ def rename(paths, choices, history=None):
 def update_current_paths(moves):
     current_paths[:] = [moves.get(path, path) for path in current_paths]
 
-def rename_selected(choices):
-    if not current_paths:
-        messagebox.showwarning("Selection Not Found", "No files or folders selected.")
-        return
-    try:
-        moves = rename(current_paths, choices)
-    except RenameError as error:
-        messagebox.showerror("Rename Failed", str(error))
-        return
-    update_current_paths(moves)
-    if moves:
-        messagebox.showinfo("Renamed", "\n".join(
-            f"{os.path.basename(old)} → {os.path.basename(new)}" for old, new in moves.items()))
+def name_changes(moves):
+    return [f"{os.path.basename(old)} → {os.path.basename(new)}" for old, new in moves.items()]
+
+def rename_report(moves):
+    """(kind, headline, details) for the status area after a rename."""
+    if not moves:
+        return "info", "Nothing to change: the names already look like this", []
+    changes = name_changes(moves)
+    if len(changes) == 1:
+        return "success", f"Renamed {changes[0]}", []
+    return "success", f"Renamed {len(changes)} items", changes
+
+def undo_report(moves):
+    if not moves:
+        return "info", "Nothing to undo for these items", []
+    restored = [os.path.basename(new) for new in moves.values()]
+    if len(restored) == 1:
+        return "success", f"Restored {restored[0]}", []
+    return "success", f"Restored {len(restored)} items", name_changes(moves)
+
+def problem_report(error):
+    headline, *details = str(error).splitlines()
+    if headline == "Nothing was renamed." and details:
+        if len(details) == 1:
+            return "error", f"Nothing was renamed: {details[0]}", []
+        return "error", f"Nothing was renamed: {len(details)} Problems", details
+    return "error", headline, details
 
 def undo(paths, history=None):
     """Restore the original names of paths renamed earlier; return {old path: new path}."""
@@ -73,61 +88,108 @@ def undo(paths, history=None):
     RenameTransaction(history).undo(paths)
     return moves
 
+def rename_selected(choices):
+    if not current_paths:
+        return "error", "No files or folders selected", []
+    try:
+        moves = rename(current_paths, choices)
+    except RenameError as error:
+        return problem_report(error)
+    update_current_paths(moves)
+    return rename_report(moves)
+
 def undo_selected():
     try:
         moves = undo(current_paths)
     except RenameError as error:
-        messagebox.showerror("Undo Failed", str(error))
-        return
+        return problem_report(error)
     update_current_paths(moves)
-    if moves:
-        messagebox.showinfo("Restored", "Restored original name for:\n" + "\n".join(
-            os.path.basename(old) for old in moves))
-    else:
-        messagebox.showinfo("Nothing Restored", "No match found in backup.")
+    return undo_report(moves)
+
+FONT = "JetBrainsMono Nerd Font"
+STYLES = ["kebab-case", "PascalCase", "snake_case", "camelCase", "UPPERCASE", "lowercase", "Title Case", "Sentence case"]
+
+def apply_theme(root, palette):
+    """Colour every ttk widget with the Omarchy palette."""
+    background, surface, foreground = palette["background"], palette["surface"], palette["foreground"]
+    muted, accent = palette["muted"], palette["accent"]
+    root.configure(bg=background)
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    style.configure(".", background=background, foreground=foreground, font=(FONT, 10),
+                    bordercolor=muted, lightcolor=background, darkcolor=background,
+                    troughcolor=surface, focuscolor=accent, insertcolor=foreground)
+    style.configure("Heading.TLabel", foreground=muted, font=(FONT, 9, "bold"))
+    style.configure("TCheckbutton", indicatorbackground=surface, indicatorforeground=background,
+                    indicatormargin=(0, 0, 8, 0), padding=(0, 3))
+    style.map("TCheckbutton", background=[("active", background)],
+              indicatorbackground=[("selected", accent), ("active", mix(surface, accent, 0.25))])
+    for widget in ("TEntry", "TCombobox"):
+        style.configure(widget, fieldbackground=surface, foreground=foreground, padding=(6, 4),
+                        bordercolor=surface, lightcolor=surface, darkcolor=surface,
+                        selectbackground=accent, selectforeground=background, arrowcolor=foreground)
+        style.map(widget, bordercolor=[("focus", accent)], lightcolor=[("focus", accent)],
+                  fieldbackground=[("readonly", surface)], foreground=[("readonly", foreground)],
+                  selectbackground=[("readonly", surface)], selectforeground=[("readonly", foreground)])
+    style.map("TCombobox", background=[("active", surface), ("readonly", surface)])
+    root.option_add("*TCombobox*Listbox.background", surface)
+    root.option_add("*TCombobox*Listbox.foreground", foreground)
+    root.option_add("*TCombobox*Listbox.selectBackground", accent)
+    root.option_add("*TCombobox*Listbox.selectForeground", background)
+    root.option_add("*TCombobox*Listbox.font", (FONT, 10))
+    style.configure("Rename.TButton", background=accent, foreground=background, bordercolor=accent,
+                    font=(FONT, 10, "bold"), padding=(0, 7))
+    style.map("Rename.TButton", background=[("active", mix(accent, foreground, 0.2))])
+    style.configure("Undo.TButton", background=background, foreground=foreground, bordercolor=muted,
+                    padding=(0, 6))
+    style.map("Undo.TButton", background=[("active", surface)], bordercolor=[("active", accent)])
 
 def main():
     current_paths[:] = [os.path.abspath(p) for p in sys.argv[1:]]
+    palette = load_palette()
 
     # The window class lets the Hyprland rule float and centre the window
     root = tk.Tk(className="omnirename")
     root.title("OmniRename")
-    root.geometry("370x420")
-    root.configure(bg="#F0F0F0")
+    root.resizable(False, False)
+    root.minsize(320, 1)
+    apply_theme(root, palette)
     root.bind("<Escape>", lambda event: root.destroy())
-    root.bind("<Return>", lambda event: rename_selected(get_choices()))
 
-    # Case style dropdown
+    form = ttk.Frame(root, padding=(18, 14, 18, 16))
+    form.pack(fill="both", expand=True)
+    form.columnconfigure(1, weight=1)
+    row = 0
+
+    def heading(text, top=12):
+        nonlocal row
+        ttk.Label(form, text=text.upper(), style="Heading.TLabel").grid(
+            row=row, column=0, columnspan=2, sticky="w", pady=(top, 4))
+        row += 1
+
+    def ticked_value(label, value=""):
+        nonlocal row
+        var = tk.BooleanVar()
+        entry = ttk.Entry(form, width=12, font=(FONT, 10))
+        entry.insert(0, value)
+        ttk.Checkbutton(form, text=label, variable=var).grid(row=row, column=0, sticky="w")
+        entry.grid(row=row, column=1, sticky="e", padx=(16, 0), pady=2)
+        row += 1
+        return var, entry
+
+    heading("Style", top=0)
     style_var = tk.StringVar(value="kebab-case")
-    ttk.Label(root, text="Choose case style:", background="#F0F0F0").pack(pady=(10, 0))
-    ttk.Combobox(root, textvariable=style_var, values=[
-        "kebab-case", "PascalCase", "snake_case", "camelCase", "UPPERCASE", "lowercase", "Title Case", "Sentence case"
-    ], state="readonly").pack(pady=4)
+    ttk.Combobox(form, textvariable=style_var, values=STYLES, state="readonly", font=(FONT, 10)).grid(
+        row=row, column=0, columnspan=2, sticky="ew")
+    row += 1
 
-    # Date boxes
-    tk.Label(root, text="Prefix Options:", bg="#F0F0F0", font=("Segoe UI", 9, "bold")).pack()
-    date_boxes = {}
-    for label in ["yyyymmdd", "yyyymm", "yyyy"]:
-        f = tk.Frame(root, bg="#F0F0F0")
-        var = tk.BooleanVar()
-        entry = tk.Entry(f, width=10)
-        tk.Checkbutton(f, text=label, variable=var, bg="#F0F0F0").pack(side="left")
-        entry.pack(side="right")
-        f.pack(pady=1)
-        entry.insert(0, date.today().strftime(DATE_ENTRY_FORMATS[label]))
-        date_boxes[label] = (var, entry)
+    heading("Date")
+    date_boxes = {label: ticked_value(label, date.today().strftime(DATE_ENTRY_FORMATS[label]))
+                  for label in DATE_ENTRY_FORMATS}
 
-    # Version and Initials boxes
-    tk.Label(root, text="Suffix Options:", bg="#F0F0F0", font=("Segoe UI", 9, "bold")).pack()
-    version_and_initials_boxes = {}
-    for label in ["v", "initials"]:
-        f = tk.Frame(root, bg="#F0F0F0")
-        var = tk.BooleanVar()
-        entry = tk.Entry(f, width=10)
-        tk.Checkbutton(f, text=label, variable=var, bg="#F0F0F0").pack(side="left")
-        entry.pack(side="right")
-        f.pack(pady=1)
-        version_and_initials_boxes[label] = (var, entry)
+    heading("Version and Initials")
+    version_box = ticked_value("Version")
+    initials_box = ticked_value("Initials")
 
     # At most one Date: ticking one date box unticks the others
     def keep_one_date(chosen):
@@ -139,24 +201,67 @@ def main():
     for label, (var, entry) in date_boxes.items():
         var.trace_add("write", lambda *args, label=label: keep_one_date(label))
 
-    def typed_if_ticked(boxes, label):
-        var, entry = boxes[label]
+    def typed_if_ticked(box):
+        var, entry = box
         return entry.get().strip() if var.get() else None
 
     def get_choices():
-        dates = [typed_if_ticked(date_boxes, label) for label in date_boxes if date_boxes[label][0].get()]
+        dates = [typed_if_ticked(box) for box in date_boxes.values() if box[0].get()]
         return Choices(
             style_var.get(),
             date=dates[0] if dates else None,
-            version=typed_if_ticked(version_and_initials_boxes, "v"),
-            initials=typed_if_ticked(version_and_initials_boxes, "initials") or None,
+            version=typed_if_ticked(version_box),
+            initials=typed_if_ticked(initials_box) or None,
         )
 
-    # Buttons
-    tk.Button(root, text="Rename", command=lambda: rename_selected(get_choices()), bg="#4CAF50", fg="white", font=("Segoe UI", 10, "bold")).pack(pady=(8, 2), padx=20, fill="x")
+    # Status area: one line about the last action, with the full list behind Show all
+    status = tk.Frame(form, bg=palette["background"])
+    status_text = tk.Label(status, justify="left", anchor="w", wraplength=300, font=(FONT, 9),
+                           padx=10, pady=8)
+    status_text.pack(fill="x")
+    show_all = tk.Button(status, relief="flat", borderwidth=0, highlightthickness=0, cursor="hand2", padx=0, pady=0,
+                         font=(FONT, 9, "underline"), fg=palette["accent"],
+                         activeforeground=palette["foreground"])
+    details = tk.Text(status, height=1, width=36, relief="flat", wrap="word", font=(FONT, 9),
+                      bg=palette["surface"], fg=palette["foreground"], padx=10, pady=6,
+                      highlightthickness=0)
 
-    tk.Button(root, text="Undo Rename", command=undo_selected,
-              bg="#607D8B", fg="white", font=("Segoe UI", 10, "bold")).pack(pady=(0, 10), padx=20, fill="x")
+    def show(report):
+        kind, headline, lines = report
+        colour = {"success": palette["success"], "error": palette["error"]}.get(kind, palette["muted"])
+        tint = mix(palette["background"], colour, 0.15)
+        status.configure(bg=tint, highlightbackground=colour, highlightthickness=1)
+        status_text.configure(text=headline, bg=tint, fg=colour if kind != "info" else palette["foreground"])
+        details.pack_forget()
+        show_all.pack_forget()
+        details.configure(state="normal")
+        details.delete("1.0", "end")
+        details.insert("1.0", "\n".join(lines))
+        # Wrapped lines take more than one row; show up to 10 rows and scroll the rest
+        rows = sum(-(-len(line) // 36) or 1 for line in lines)
+        details.configure(state="disabled", height=min(rows, 10))
+        status.grid(row=status_row, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        if lines:
+            def toggle():
+                if details.winfo_ismapped():
+                    details.pack_forget()
+                    show_all.configure(text=f"Show all {len(lines)}")
+                else:
+                    details.pack(fill="both", padx=1, pady=(0, 1))
+                    show_all.configure(text="Hide list")
+            show_all.configure(text=f"Show all {len(lines)}", command=toggle, bg=tint, activebackground=tint)
+            show_all.pack(anchor="w", padx=10, pady=(0, 8))
+
+    buttons = ttk.Frame(form)
+    buttons.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(16, 0))
+    buttons.columnconfigure(0, weight=1)
+    row += 1
+    status_row = row
+    ttk.Button(buttons, text="Rename", style="Rename.TButton",
+               command=lambda: show(rename_selected(get_choices()))).grid(row=0, column=0, sticky="ew")
+    ttk.Button(buttons, text="Undo Rename", style="Undo.TButton",
+               command=lambda: show(undo_selected())).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+    root.bind("<Return>", lambda event: show(rename_selected(get_choices())))
 
     root.mainloop()
 

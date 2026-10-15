@@ -97,3 +97,38 @@ class RenameTests(unittest.TestCase):
 
         self.assertIn("Date", str(raised.exception))
         self.assertEqual(source.read_text(), "A")
+
+
+class ReportTests(unittest.TestCase):
+    def test_one_rename_is_reported_in_full(self):
+        report = omni_care.rename_report({"/a/My Report.txt": "/a/my-report.txt"})
+
+        self.assertEqual(report, ("success", "Renamed My Report.txt → my-report.txt", []))
+
+    def test_several_renames_are_counted_with_the_list_behind_show_all(self):
+        report = omni_care.rename_report({"/a/A.txt": "/a/a.txt", "/a/B.txt": "/a/b.txt"})
+
+        self.assertEqual(report, ("success", "Renamed 2 items", ["A.txt → a.txt", "B.txt → b.txt"]))
+
+    def test_nothing_to_change_is_said_plainly(self):
+        self.assertEqual(
+            omni_care.rename_report({}), ("info", "Nothing to change: the names already look like this", [])
+        )
+
+    def test_a_single_problem_is_shown_in_full(self):
+        report = omni_care.problem_report(RenameError("Nothing was renamed.\nVersion vabc is not a number"))
+
+        self.assertEqual(report, ("error", "Nothing was renamed: Version vabc is not a number", []))
+
+    def test_several_problems_are_counted_with_the_list_behind_show_all(self):
+        report = omni_care.problem_report(RenameError("Nothing was renamed.\nfirst\nsecond"))
+
+        self.assertEqual(report, ("error", "Nothing was renamed: 2 Problems", ["first", "second"]))
+
+    def test_undo_is_reported_like_a_rename(self):
+        self.assertEqual(
+            omni_care.undo_report({"/a/a.txt": "/a/A.txt"}), ("success", "Restored A.txt", [])
+        )
+        self.assertEqual(
+            omni_care.undo_report({}), ("info", "Nothing to undo for these items", [])
+        )

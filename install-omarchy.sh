@@ -25,7 +25,7 @@ awk '
   printf '%s\n' "$start_marker"
   printf '%s\n' '-- OmniRename opens on the Nautilus selection and forwards Alt+S everywhere else.'
   printf '%s\n' "o.bind(\"ALT + S\", \"OmniRename / forward Alt+S\", \"python $plugin_dir/omni_dispatch.py\")"
-  printf '%s\n' 'o.window("^Omnirename$", { float = true, center = true })'
+  printf '%s\n' 'o.window("^Omnirename$", { float = true, center = true, opacity = "1 1" })'
   printf '%s\n' "$end_marker"
 } >> "$temporary"
 install -m 0644 "$temporary" "$bindings"
