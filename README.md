@@ -52,7 +52,7 @@ checks for configuration errors.
 5. Press **Rename** (or `Enter`).
 
 The result shows at the bottom of the window; **Show all** lists every item
-when there are several. The window stays open until you press `Escape`.
+when there are several. The window stays open until you press `Escape` or `Alt+S`.
 
 If anything would go wrong, such as two items ending up with the same name, an
 existing item in the way, or an invalid Date, nothing is renamed and the window
@@ -109,6 +109,7 @@ The History is kept in `~/.local/state/omnirename/rename_backlog.json`.
 |---|---|
 | `Enter` | Rename |
 | `Escape` | Close the open page, or the window |
+| `Alt+S` | Close the window |
 | `?` | How to rename and undo |
 
 The question mark icon in the top right corner shows how to rename and undo.
