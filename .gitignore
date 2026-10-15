@@ -13,3 +13,7 @@ dist/
 # Local runtime state
 rename_backlog.json
 rename-history.json
+
+# Mock folders and their history, made by mock/seed.py
+mock/folders/
+mock/state/
