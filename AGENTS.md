@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues on `kaaldev73/omni-rename` (always pass `--repo kaaldev73/omni-rename` to `gh`). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues on `kaaldev73/omarchy-omni-renamer` (always pass `--repo kaaldev73/omarchy-omni-renamer` to `gh`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
