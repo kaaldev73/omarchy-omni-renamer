@@ -1,4 +1,5 @@
 import json
+from datetime import date
 import tempfile
 import unittest
 from pathlib import Path
@@ -132,3 +133,13 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(
             omni_care.undo_report({}), ("info", "Nothing to undo for these items", [])
         )
+
+
+class GuideTests(unittest.TestCase):
+    def test_the_guide_shows_one_example_name_per_style(self):
+        examples = dict(omni_care.guide_examples(date(2026, 10, 15)))
+
+        self.assertEqual(len(examples), 8)
+        self.assertEqual(examples["kebab-case"], "20261015-project-report-v2-KR.pdf")
+        self.assertEqual(examples["snake_case"], "20261015_project_report_v2_KR.pdf")
+        self.assertEqual(examples["PascalCase"], "20261015-ProjectReport-v2-KR.pdf")

@@ -109,6 +109,65 @@ def undo_selected():
 FONT = "JetBrainsMono Nerd Font"
 STYLES = ["kebab-case", "PascalCase", "snake_case", "camelCase", "UPPERCASE", "lowercase", "Title Case", "Sentence case"]
 
+def guide_examples(day):
+    """(Style, example name) for every Style, made by the same code that renames."""
+    choices = dict(date=day.strftime("%Y%m%d"), version="2", initials="KR")
+    return [(style, propose_name("Project Report.pdf", Choices(style, **choices))) for style in STYLES]
+
+GUIDE_PARTS = [
+    ("Date", "yyyymmdd, yyyymm or yyyy, always first"),
+    ("Name", "what the item is; shaped by the Style"),
+    ("Version", "v and a number; an empty box bumps it"),
+    ("Initials", "who made it, kept exactly as typed"),
+]
+
+GUIDE_FOLDERS = [
+    ("Top-level folders", "Sentence case", "Client projects"),
+    ("Everything inside", "kebab-case", "project-report"),
+]
+
+def build_guide(parent, palette):
+    """The naming structure, an example in every Style, and the folder rule."""
+    guide = ttk.Frame(parent, padding=(18, 14, 18, 16))
+    guide.columnconfigure(1, weight=1)
+    row = 0
+
+    def heading(text, top=14):
+        nonlocal row
+        ttk.Label(guide, text=text.upper(), style="Heading.TLabel").grid(
+            row=row, column=0, columnspan=2, sticky="w", pady=(top, 4))
+        row += 1
+
+    def line(left, right, left_colour=None, right_colour=None):
+        nonlocal row
+        ttk.Label(guide, text=left, foreground=left_colour or palette["muted"], font=(FONT, 9)).grid(
+            row=row, column=0, sticky="w", padx=(0, 14), pady=1)
+        ttk.Label(guide, text=right, foreground=right_colour or palette["foreground"], font=(FONT, 9)).grid(
+            row=row, column=1, sticky="w", pady=1)
+        row += 1
+
+    heading("Naming structure", top=0)
+    ttk.Label(guide, text="DATE-NAME-VERSION-INITIALS.ext", foreground=palette["accent"],
+              font=(FONT, 11, "bold")).grid(row=row, column=0, columnspan=2, sticky="w")
+    row += 1
+    ttk.Label(guide, text="Only the Name is always there; the Style sets the separator.",
+              foreground=palette["muted"], font=(FONT, 9)).grid(
+        row=row, column=0, columnspan=2, sticky="w", pady=(2, 0))
+    row += 1
+
+    heading("Parts")
+    for part, rule in GUIDE_PARTS:
+        line(part, rule)
+
+    heading("Every Style")
+    for style, example in guide_examples(date.today()):
+        line(style, example, right_colour=palette["accent"])
+
+    heading("Folders")
+    for where, style, example in GUIDE_FOLDERS:
+        line(where, f"{style}  ({example})")
+    return guide
+
 def apply_theme(root, palette):
     """Colour every ttk widget with the Omarchy palette."""
     background, surface, foreground = palette["background"], palette["surface"], palette["foreground"]
@@ -155,10 +214,30 @@ def main():
     root.resizable(False, False)
     root.minsize(320, 1)
     apply_theme(root, palette)
-    root.bind("<Escape>", lambda event: root.destroy())
+    root.bind("<Escape>", lambda event: toggle_guide() if guide.winfo_ismapped() else root.destroy())
+    root.bind("<question>", lambda event: None if isinstance(event.widget, ttk.Entry) else toggle_guide())
 
     form = ttk.Frame(root, padding=(18, 14, 18, 16))
     form.pack(fill="both", expand=True)
+    guide = build_guide(root, palette)
+
+    # The info icon swaps the form for the naming guide and back
+    def toggle_guide(event=None):
+        if guide.winfo_ismapped():
+            guide.pack_forget()
+            form.pack(fill="both", expand=True)
+            info.configure(text="\uf05a")
+        else:
+            form.pack_forget()
+            guide.pack(fill="both", expand=True)
+            info.configure(text="\uf00d")
+        info.lift()
+
+    info = tk.Button(root, text="\uf05a", command=toggle_guide, relief="flat", borderwidth=0,
+                     highlightthickness=0, cursor="hand2", font=(FONT, 13), padx=4, pady=0,
+                     bg=palette["background"], fg=palette["muted"],
+                     activebackground=palette["background"], activeforeground=palette["accent"])
+    info.place(relx=1.0, x=-12, y=6, anchor="ne")
     form.columnconfigure(1, weight=1)
     row = 0
 
