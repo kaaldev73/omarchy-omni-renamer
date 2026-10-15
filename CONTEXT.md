@@ -29,7 +29,7 @@ _Avoid_: case, format
 ### Safety
 
 **Problem**:
-A reason one item cannot be renamed (duplicate result, existing target, invalid name, missing source); any Problem stops the whole rename.
+A reason an item cannot be renamed (duplicate result, existing target, invalid name, missing source, a typed Date or Version that is not valid); any Problem stops the whole rename.
 _Avoid_: error, conflict, warning
 
 ## GTK window (unused)
