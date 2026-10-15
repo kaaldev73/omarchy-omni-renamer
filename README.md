@@ -46,9 +46,10 @@ Omarchy installation.
    rename the window closes by itself after 3 seconds, unless you use **Show
    all** or **Undo Rename** first. `Escape` closes the window.
 
-The info icon in the top right corner (or `?`) shows the naming structure, an
-example in every Style, and the folder rule; click it again or press `Escape`
-to go back.
+Two icons sit in the top right corner: the question mark (or the `?` key) shows
+how to rename and undo, and the info icon shows the naming structure, an
+example in every Style, and the folder rule. Click the icon again or press
+`Escape` to go back.
 
 The rename history is kept in `~/.local/state/omnirename/rename_backlog.json`.
 The window floats centred thanks to a Hyprland window rule the installer adds.

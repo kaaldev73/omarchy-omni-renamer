@@ -126,47 +126,79 @@ GUIDE_FOLDERS = [
     ("Everything inside", "kebab-case", "project-report"),
 ]
 
+class Panel:
+    """A page of headings and two-column lines, shown in place of the form."""
+
+    def __init__(self, parent, palette):
+        self.palette = palette
+        self.frame = ttk.Frame(parent, padding=(18, 14, 18, 16))
+        self.frame.columnconfigure(1, weight=1)
+        self.row = 0
+
+    def heading(self, text, top=14):
+        ttk.Label(self.frame, text=text.upper(), style="Heading.TLabel").grid(
+            row=self.row, column=0, columnspan=2, sticky="w", pady=(top if self.row else 0, 4))
+        self.row += 1
+
+    def text(self, text, colour=None, size=9, bold=False):
+        ttk.Label(self.frame, text=text, foreground=colour or self.palette["muted"],
+                  font=(FONT, size, "bold") if bold else (FONT, size), wraplength=380).grid(
+            row=self.row, column=0, columnspan=2, sticky="w", pady=(2, 0))
+        self.row += 1
+
+    def line(self, left, right, right_colour=None):
+        ttk.Label(self.frame, text=left, foreground=self.palette["muted"], font=(FONT, 9)).grid(
+            row=self.row, column=0, sticky="nw", padx=(0, 14), pady=1)
+        ttk.Label(self.frame, text=right, foreground=right_colour or self.palette["foreground"],
+                  font=(FONT, 9), wraplength=300, justify="left").grid(
+            row=self.row, column=1, sticky="w", pady=1)
+        self.row += 1
+
 def build_guide(parent, palette):
     """The naming structure, an example in every Style, and the folder rule."""
-    guide = ttk.Frame(parent, padding=(18, 14, 18, 16))
-    guide.columnconfigure(1, weight=1)
-    row = 0
-
-    def heading(text, top=14):
-        nonlocal row
-        ttk.Label(guide, text=text.upper(), style="Heading.TLabel").grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(top, 4))
-        row += 1
-
-    def line(left, right, left_colour=None, right_colour=None):
-        nonlocal row
-        ttk.Label(guide, text=left, foreground=left_colour or palette["muted"], font=(FONT, 9)).grid(
-            row=row, column=0, sticky="w", padx=(0, 14), pady=1)
-        ttk.Label(guide, text=right, foreground=right_colour or palette["foreground"], font=(FONT, 9)).grid(
-            row=row, column=1, sticky="w", pady=1)
-        row += 1
-
-    heading("Naming structure", top=0)
-    ttk.Label(guide, text="DATE-NAME-VERSION-INITIALS.ext", foreground=palette["accent"],
-              font=(FONT, 11, "bold")).grid(row=row, column=0, columnspan=2, sticky="w")
-    row += 1
-    ttk.Label(guide, text="Only the Name is always there; the Style sets the separator.",
-              foreground=palette["muted"], font=(FONT, 9)).grid(
-        row=row, column=0, columnspan=2, sticky="w", pady=(2, 0))
-    row += 1
-
-    heading("Parts")
+    panel = Panel(parent, palette)
+    panel.heading("Naming structure")
+    panel.text("DATE-NAME-VERSION-INITIALS.ext", palette["accent"], size=11, bold=True)
+    panel.text("Only the Name is always there; the Style sets the separator.")
+    panel.heading("Parts")
     for part, rule in GUIDE_PARTS:
-        line(part, rule)
-
-    heading("Every Style")
+        panel.line(part, rule)
+    panel.heading("Every Style")
     for style, example in guide_examples(date.today()):
-        line(style, example, right_colour=palette["accent"])
-
-    heading("Folders")
+        panel.line(style, example, palette["accent"])
+    panel.heading("Folders")
     for where, style, example in GUIDE_FOLDERS:
-        line(where, f"{style}  ({example})")
-    return guide
+        panel.line(where, f"{style}  ({example})")
+    return panel.frame
+
+HELP_RENAME = [
+    "Select one or more files or folders in Nautilus",
+    "Press Alt+S to open this window",
+    "Type a new Name if you want one, choose a Style, and tick a Date, Version or Initials",
+    "Press Rename (or Enter); the window closes after 3 seconds",
+]
+
+HELP_UNDO = [
+    "Select the renamed files or folders in Nautilus",
+    "Press Alt+S",
+    "Press Undo Rename; they get their original names back",
+]
+
+HELP_KEYS = [("Enter", "Rename"), ("Escape", "close this page, or the window"), ("?", "this page")]
+
+def build_help(parent, palette):
+    """How to rename, and how to undo a rename."""
+    panel = Panel(parent, palette)
+    panel.heading("How to rename")
+    for number, step in enumerate(HELP_RENAME, 1):
+        panel.line(str(number), step)
+    panel.heading("How to undo")
+    for number, step in enumerate(HELP_UNDO, 1):
+        panel.line(str(number), step)
+    panel.heading("Keys")
+    for key, action in HELP_KEYS:
+        panel.line(key, action, palette["accent"])
+    return panel.frame
 
 def apply_theme(root, palette):
     """Colour every ttk widget with the Omarchy palette."""
@@ -214,30 +246,32 @@ def main():
     root.resizable(False, False)
     root.minsize(320, 1)
     apply_theme(root, palette)
-    root.bind("<Escape>", lambda event: toggle_guide() if guide.winfo_ismapped() else root.destroy())
-    root.bind("<question>", lambda event: None if isinstance(event.widget, ttk.Entry) else toggle_guide())
+    root.bind("<Escape>", lambda event: toggle_page(open_page) if open_page else root.destroy())
+    root.bind("<question>", lambda event: None if isinstance(event.widget, ttk.Entry) else toggle_page("help"))
 
     form = ttk.Frame(root, padding=(18, 14, 18, 16))
     form.pack(fill="both", expand=True)
-    guide = build_guide(root, palette)
+    # The two icons in the top right corner swap the form for a help page and back
+    pages = {"guide": build_guide(root, palette), "help": build_help(root, palette)}
+    icons = {}
+    open_page = None
 
-    # The info icon swaps the form for the naming guide and back
-    def toggle_guide(event=None):
-        if guide.winfo_ismapped():
-            guide.pack_forget()
-            form.pack(fill="both", expand=True)
-            info.configure(text="\uf05a")
-        else:
-            form.pack_forget()
-            guide.pack(fill="both", expand=True)
-            info.configure(text="\uf00d")
-        info.lift()
+    def toggle_page(name):
+        nonlocal open_page
+        (pages[open_page] if open_page else form).pack_forget()
+        open_page = None if open_page == name else name
+        (pages[open_page] if open_page else form).pack(fill="both", expand=True)
+        for page, (icon, glyph) in icons.items():
+            icon.configure(text="\uf00d" if page == open_page else glyph)
+            icon.lift()
 
-    info = tk.Button(root, text="\uf05a", command=toggle_guide, relief="flat", borderwidth=0,
-                     highlightthickness=0, cursor="hand2", font=(FONT, 13), padx=4, pady=0,
-                     bg=palette["background"], fg=palette["muted"],
-                     activebackground=palette["background"], activeforeground=palette["accent"])
-    info.place(relx=1.0, x=-12, y=6, anchor="ne")
+    for x, page, glyph in ((-12, "guide", "\uf05a"), (-40, "help", "\uf059")):
+        icon = tk.Button(root, text=glyph, command=lambda page=page: toggle_page(page), relief="flat",
+                         borderwidth=0, highlightthickness=0, cursor="hand2", font=(FONT, 13),
+                         padx=4, pady=0, bg=palette["background"], fg=palette["muted"],
+                         activebackground=palette["background"], activeforeground=palette["accent"])
+        icon.place(relx=1.0, x=x, y=6, anchor="ne")
+        icons[page] = (icon, glyph)
     form.columnconfigure(1, weight=1)
     row = 0
 
