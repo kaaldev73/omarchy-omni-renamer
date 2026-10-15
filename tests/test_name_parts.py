@@ -1,6 +1,6 @@
 import unittest
 
-from name_parts import Choices, propose_name
+from name_parts import Choices, existing_name, propose_name
 
 
 class ProposeNameTests(unittest.TestCase):
@@ -53,6 +53,13 @@ class ProposeNameTests(unittest.TestCase):
 
     def test_a_tar_archive_keeps_its_whole_extension(self):
         self.assertEqual(propose_name("Report.tar.gz", Choices(version="2")), "report-v2.tar.gz")
+
+    def test_a_typed_name_replaces_the_name_and_takes_the_style(self):
+        choices = Choices("kebab-case", name="Annual Plan")
+        self.assertEqual(propose_name("20261001-report-v1-KR.pdf", choices), "20261001-annual-plan-v1-KR.pdf")
+
+    def test_the_existing_name_is_the_name_part_alone(self):
+        self.assertEqual(existing_name("20261001 My Report v1 KR.pdf"), "My Report")
 
 
 if __name__ == "__main__":

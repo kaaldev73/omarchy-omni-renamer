@@ -8,7 +8,7 @@ from datetime import date
 from tkinter import ttk
 
 from omni_renamer import RenameError, RenameHistory, RenameTransaction, build_manual_plan
-from name_parts import Choices, choice_problems, propose_name
+from name_parts import Choices, choice_problems, existing_name, propose_name
 from omni_theme import load_palette, mix
 
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")
@@ -131,6 +131,7 @@ def apply_theme(root, palette):
         style.map(widget, bordercolor=[("focus", accent)], lightcolor=[("focus", accent)],
                   fieldbackground=[("readonly", surface)], foreground=[("readonly", foreground)],
                   selectbackground=[("readonly", surface)], selectforeground=[("readonly", foreground)])
+    style.configure("Placeholder.TEntry", foreground=muted)
     style.map("TCombobox", background=[("active", surface), ("readonly", surface)])
     root.option_add("*TCombobox*Listbox.background", surface)
     root.option_add("*TCombobox*Listbox.foreground", foreground)
@@ -177,7 +178,45 @@ def main():
         row += 1
         return var, entry
 
-    heading("Style", top=0)
+    heading("Name", top=0)
+    name_entry = ttk.Entry(form, font=(FONT, 10))
+    name_entry.grid(row=row, column=0, columnspan=2, sticky="ew")
+    row += 1
+    # The current Name shows as a grey placeholder; leaving the box empty keeps it
+    def current_name():
+        if len(current_paths) == 1:
+            return existing_name(os.path.basename(current_paths[0]))
+        return "Keep each item's name"
+
+    placeholder = current_name()
+    showing_placeholder = True
+
+    def show_placeholder(event=None):
+        nonlocal showing_placeholder
+        if not name_entry.get():
+            showing_placeholder = True
+            name_entry.configure(style="Placeholder.TEntry")
+            name_entry.insert(0, placeholder)
+
+    def hide_placeholder(event=None):
+        nonlocal showing_placeholder
+        if showing_placeholder:
+            showing_placeholder = False
+            name_entry.delete(0, "end")
+            name_entry.configure(style="TEntry")
+
+    def refresh_placeholder():
+        nonlocal placeholder
+        placeholder = current_name()
+        if showing_placeholder:
+            name_entry.delete(0, "end")
+            name_entry.insert(0, placeholder)
+
+    name_entry.bind("<FocusIn>", hide_placeholder)
+    name_entry.bind("<FocusOut>", show_placeholder)
+    show_placeholder()
+
+    heading("Style")
     style_var = tk.StringVar(value="kebab-case")
     ttk.Combobox(form, textvariable=style_var, values=STYLES, state="readonly", font=(FONT, 10)).grid(
         row=row, column=0, columnspan=2, sticky="ew")
@@ -209,6 +248,7 @@ def main():
         dates = [typed_if_ticked(box) for box in date_boxes.values() if box[0].get()]
         return Choices(
             style_var.get(),
+            name=None if showing_placeholder else name_entry.get().strip() or None,
             date=dates[0] if dates else None,
             version=typed_if_ticked(version_box),
             initials=typed_if_ticked(initials_box) or None,
@@ -227,6 +267,7 @@ def main():
                       highlightthickness=0)
 
     def show(report):
+        refresh_placeholder()
         kind, headline, lines = report
         colour = {"success": palette["success"], "error": palette["error"]}.get(kind, palette["muted"])
         tint = mix(palette["background"], colour, 0.15)

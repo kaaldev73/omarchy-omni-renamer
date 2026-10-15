@@ -14,6 +14,10 @@ _Avoid_: decoration, segment, field, prefix, suffix
 The Name Part saying when the item is from, as yyyymmdd, yyyymm or yyyy; today unless changed, and at most one per name.
 _Avoid_: timestamp
 
+**Name**:
+The Name Part saying what the item is; kept from the current name unless a new one is typed, and always shaped by the Style.
+_Avoid_: title, base name
+
 **Version**:
 The Name Part saying which revision the item is, written `v` followed by a number (`v2`); asking for a Version without a number bumps the existing one, or starts at `v1`.
 _Avoid_: revision number

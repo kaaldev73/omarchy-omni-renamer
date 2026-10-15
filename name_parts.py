@@ -11,6 +11,7 @@ class Choices:
     """What to apply; None leaves a Name Part as it is, an empty version bumps it."""
 
     style: str = "kebab-case"
+    name: str | None = None
     date: str | None = None
     version: str | None = None
     initials: str | None = None
@@ -103,9 +104,17 @@ def split_extension(original_name):
     return hidden, stem, ext
 
 
+def existing_name(original_name):
+    """The Name Part of an item's current name, before any Style."""
+    hidden, stem, ext = split_extension(original_name)
+    return split_name_parts(stem)[1]
+
+
 def propose_name(original_name, choices):
     hidden, stem, ext = split_extension(original_name)
     date, name, version, initials = split_name_parts(stem)
+    if choices.name and choices.name.strip():
+        name = choices.name.strip()
     if choices.version == "":
         version = str(int(version) + 1) if version else "1"
     elif choices.version:
