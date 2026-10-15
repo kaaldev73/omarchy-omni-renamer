@@ -112,7 +112,6 @@ folder rule. Click the icon again or press `Escape` to go back.
 ## Development
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v
 omarchy plugin validate .
 ```
 
