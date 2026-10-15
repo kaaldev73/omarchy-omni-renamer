@@ -42,7 +42,7 @@ omarchy plugin add https://github.com/YOUR-NAME/omnirename.git --enable
 
 The installer backs up `~/.config/hypr/bindings.lua`, adds one contextual `Alt+S`
 binding (replacing the `F2` one from earlier versions), rescans the Omarchy shell, reloads Hyprland, and checks configuration
-errors. Dependencies (`python`, `wtype`, and `wl-clipboard`) are already present
+errors. Dependencies (`python` and `wl-clipboard`) are already present
 in a standard Omarchy installation.
 
 ## Use
