@@ -409,9 +409,49 @@ def main():
 
     heading("Style", top=12 if one_item else 0)
     style_var = tk.StringVar(value="kebab-case")
-    ttk.Combobox(form, textvariable=style_var, values=STYLES, state="readonly", font=(FONT, 10)).grid(
-        row=row, column=0, columnspan=2, sticky="ew")
+    style_box = ttk.Combobox(form, textvariable=style_var, values=STYLES, state="readonly", font=(FONT, 10))
+    style_box.grid(row=row, column=0, columnspan=2, sticky="ew")
     row += 1
+
+    # A dropdown list opens as a window of its own, which Hyprland stretches over most of the
+    # screen, so the Styles open as a list inside this window instead
+    style_list = tk.Listbox(form, height=len(STYLES), activestyle="none", exportselection=False,
+                            relief="flat", borderwidth=0, highlightthickness=1, font=(FONT, 10),
+                            bg=palette["surface"], fg=palette["foreground"],
+                            selectbackground=palette["accent"], selectforeground=palette["background"],
+                            highlightbackground=palette["muted"], highlightcolor=palette["accent"])
+    style_list.insert("end", *STYLES)
+    style_list.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(2, 0))
+    style_list.grid_remove()
+    row += 1
+
+    def open_styles(event=None):
+        if style_list.winfo_ismapped():
+            return close_styles()
+        current = STYLES.index(style_var.get())
+        style_list.selection_clear(0, "end")
+        style_list.selection_set(current)
+        style_list.activate(current)
+        style_list.grid()
+        style_list.focus_set()
+        return "break"
+
+    def close_styles(event=None):
+        style_list.grid_remove()
+        style_box.focus_set()
+        return "break"
+
+    def choose_style(event=None):
+        chosen = style_list.curselection()
+        if chosen:
+            style_var.set(STYLES[chosen[0]])
+        return close_styles()
+
+    for sequence in ("<Button-1>", "<Down>", "<space>"):
+        style_box.bind(sequence, open_styles)
+    style_list.bind("<ButtonRelease-1>", choose_style)
+    style_list.bind("<Return>", choose_style)
+    style_list.bind("<Escape>", close_styles)
 
     heading("Date")
     date_boxes = {label: ticked_value(label, date.today().strftime(DATE_ENTRY_FORMATS[label]))
