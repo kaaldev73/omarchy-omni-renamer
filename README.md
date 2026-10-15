@@ -42,7 +42,9 @@ Omarchy installation.
    Initials and adjust its value.
 4. Press **Rename**. **Undo Rename** restores the original names of the files
    the window was opened on. The result shows at the bottom of the window;
-   **Show all** lists every item when there are several. `Escape` closes the window.
+   **Show all** lists every item when there are several. After a successful
+   rename the window closes by itself after 3 seconds, unless you use **Show
+   all** or **Undo Rename** first. `Escape` closes the window.
 
 The rename history is kept in `~/.local/state/omnirename/rename_backlog.json`.
 The window floats centred thanks to a Hyprland window rule the installer adds.
