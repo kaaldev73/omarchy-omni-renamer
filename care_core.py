@@ -1,58 +1,18 @@
-"""Safe, platform-independent filename transformation and rename transactions."""
+"""Safe, all-or-nothing renames with undo history."""
 
 from __future__ import annotations
 
 import json
 import os
-import re
 import tempfile
 import uuid
 from dataclasses import dataclass, replace
-from datetime import date
 from pathlib import Path
 from typing import Iterable
 
 
-CASE_STYLES = (
-    "kebab-case",
-    "PascalCase",
-    "snake_case",
-    "camelCase",
-    "UPPERCASE",
-    "lowercase",
-    "Title Case",
-    "Sentence case",
-)
-
-_WINDOWS_RESERVED = {
-    "CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
-}
-_COMPOUND_EXTENSIONS = (".tar.gz", ".tar.bz2", ".tar.xz")
-
-
 class RenameError(RuntimeError):
     """Raised when a rename plan cannot be safely completed."""
-
-
-@dataclass(frozen=True)
-class NamingOptions:
-    case_style: str = "kebab-case"
-    name: str = ""
-    prefixes: tuple[str, ...] = ()
-    suffixes: tuple[str, ...] = ()
-    find: str = ""
-    replace: str = ""
-    use_regex: bool = False
-    case_sensitive: bool = False
-    counter_start: int | None = None
-    counter_step: int = 1
-    counter_padding: int = 2
-    counter_position: str = "suffix"
-    trim_start: int = 0
-    trim_end: int = 0
-    person: str = ""
-    person_position: str = "suffix"
 
 
 @dataclass(frozen=True)
@@ -88,151 +48,8 @@ def default_history_path() -> Path:
     return base / "OmniRename" / "rename-history.json"
 
 
-def _split_extension(filename: str) -> tuple[str, str]:
-    lowered = filename.lower()
-    for extension in _COMPOUND_EXTENSIONS:
-        if lowered.endswith(extension):
-            return filename[: -len(extension)], filename[-len(extension) :]
-    return os.path.splitext(filename)
-
-
-def _words(value: str) -> list[str]:
-    value = value.replace("_", " ")
-    value = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value)
-    value = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", value)
-    value = re.sub(r"([A-Za-z])([0-9])|([0-9])([A-Za-z])", r"\1\3 \2\4", value)
-    value = re.sub(r"[^\w]+", " ", value, flags=re.UNICODE)
-    return [word for word in value.strip().split() if word]
-
-
-def _convert_stem(stem: str, style: str) -> str:
-    if style not in CASE_STYLES:
-        raise ValueError(f"Unsupported case style: {style}")
-    words = _words(stem)
-    if not words:
-        return ""
-    if style == "kebab-case":
-        return "-".join(word.lower() for word in words)
-    if style == "snake_case":
-        return "_".join(word.lower() for word in words)
-    if style == "PascalCase":
-        return "".join(word[:1].upper() + word[1:].lower() for word in words)
-    if style == "camelCase":
-        return words[0].lower() + "".join(
-            word[:1].upper() + word[1:].lower() for word in words[1:]
-        )
-    if style == "UPPERCASE":
-        return " ".join(words).upper()
-    if style == "lowercase":
-        return " ".join(words).lower()
-    if style == "Title Case":
-        return " ".join(word.capitalize() for word in words)
-    return " ".join(words).lower().capitalize()
-
-
-def date_prefixes(value: date, formats: Iterable[str]) -> tuple[str, ...]:
-    supported = {"yyyymmdd": "%Y%m%d", "yyyymm": "%Y%m", "yyyy": "%Y"}
-    return tuple(value.strftime(supported[item]) for item in formats if item in supported)
-
-
-def transform_filename(
-    filename: str,
-    options: NamingOptions,
-    *,
-    preserve_extension: bool = True,
-    index: int = 0,
-) -> str:
-    stem, extension = _split_extension(filename) if preserve_extension else (filename, "")
-    if options.trim_start:
-        stem = stem[max(0, options.trim_start) :]
-    if options.trim_end:
-        stem = stem[: -max(0, options.trim_end)] if options.trim_end < len(stem) else ""
-    if options.find:
-        flags = 0 if options.case_sensitive else re.IGNORECASE
-        pattern = options.find if options.use_regex else re.escape(options.find)
-        try:
-            stem = re.sub(pattern, options.replace, stem, flags=flags)
-        except re.error as error:
-            raise ValueError(f"Invalid regular expression: {error}") from error
-    converted = _convert_stem(options.name.strip() if options.name.strip() else stem, options.case_style)
-    separator = "_" if options.case_style == "snake_case" else "-"
-    prefixes = list(options.prefixes)
-    suffixes = list(options.suffixes)
-    if options.person.strip():
-        if options.person_position == "prefix":
-            prefixes.append(options.person)
-        else:
-            suffixes.insert(0, options.person)
-    if options.counter_start is not None:
-        counter = options.counter_start + index * options.counter_step
-        token = str(counter).zfill(max(1, options.counter_padding))
-        if options.counter_position == "prefix":
-            prefixes.append(token)
-        elif options.counter_position == "before_suffix":
-            suffixes.insert(0, token)
-        else:
-            suffixes.append(token)
-    decorations = (*prefixes, converted, *suffixes)
-    clean = [part.strip(" .-_") for part in decorations if part.strip(" .-_")]
-    result = separator.join(clean) + extension
-    if not clean:
-        raise ValueError("The selected options produce an empty filename.")
-    if any(character in result for character in '<>:"/\\|?*'):
-        raise ValueError("The filename contains a character Windows does not allow.")
-    if any(ord(character) < 32 for character in result):
-        raise ValueError("The filename contains a control character Windows does not allow.")
-    if result.rstrip(" .") != result:
-        raise ValueError("Windows filenames cannot end with a space or period.")
-    if clean[0].split(".")[0].upper() in _WINDOWS_RESERVED:
-        raise ValueError("The filename is reserved by Windows.")
-    if len(result) > 255:
-        raise ValueError("The filename exceeds the 255-character limit.")
-    return result
-
-
-def build_rename_plan(paths: Iterable[Path | str], options: NamingOptions) -> RenamePlan:
-    source_paths = tuple(Path(path) for path in paths)
-    source_keys = {str(path.absolute()).casefold() for path in source_paths}
-    provisional: list[RenameItem] = []
-    destination_counts: dict[str, int] = {}
-
-    for index, source in enumerate(source_paths):
-        try:
-            destination = source.with_name(
-                transform_filename(
-                    source.name,
-                    options,
-                    preserve_extension=not source.is_dir(),
-                    index=index,
-                )
-            )
-            problem = "" if source.exists() else "Source no longer exists"
-        except ValueError as error:
-            destination = source
-            problem = str(error)
-        key = str(destination.absolute()).casefold()
-        destination_counts[key] = destination_counts.get(key, 0) + 1
-        provisional.append(RenameItem(source, destination, problem))
-
-    result: list[RenameItem] = []
-    for item in provisional:
-        problem = item.problem
-        destination_key = str(item.destination.absolute()).casefold()
-        if not problem and destination_counts[destination_key] > 1:
-            problem = "More than one item would receive this name"
-        elif (
-            not problem
-            and item.changed
-            and item.destination.exists()
-            and destination_key not in source_keys
-        ):
-            problem = "A file or folder with this name already exists"
-        result.append(replace(item, problem=problem))
-    return RenamePlan(tuple(result))
-
-
 def build_manual_plan(renames: Iterable[tuple[Path | str, str]]) -> RenamePlan:
-    """Validate user- or agent-proposed basenames without transforming them."""
+    """Validate proposed basenames, recording a Problem per item that cannot be renamed."""
     pairs = [(Path(source), str(name)) for source, name in renames]
     source_keys = {str(source.absolute()).casefold() for source, _ in pairs}
     counts: dict[str, int] = {}

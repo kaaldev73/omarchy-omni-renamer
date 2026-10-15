@@ -7,8 +7,6 @@ __pycache__/
 # Generated release output
 build/
 dist/
-CaRe/build/
-CaRe/dist/
 *.rar
 *.exe
 
