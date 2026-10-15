@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from care_core import RenameError, RenameHistory, RenameTransaction, build_manual_plan
+from omni_renamer import RenameError, RenameHistory, RenameTransaction, build_manual_plan
 
 
 class PlanningTests(unittest.TestCase):

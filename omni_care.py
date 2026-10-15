@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import date
 from tkinter import ttk, messagebox
 
-from care_core import RenameError, RenameHistory, RenameTransaction, build_manual_plan
+from omni_renamer import RenameError, RenameHistory, RenameTransaction, build_manual_plan
 from name_parts import Choices, choice_problems, propose_name
 
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")

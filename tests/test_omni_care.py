@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 import omni_care
-from care_core import RenameError
+from omni_renamer import RenameError
 from name_parts import Choices
 
 

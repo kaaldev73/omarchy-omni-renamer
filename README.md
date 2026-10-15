@@ -51,7 +51,7 @@ omarchy plugin validate .
 ```
 
 `omni_care.py` is the window `Alt+S` opens, `name_parts.py` builds each new
-name, and `care_core.py` checks and carries out the renames with undo history.
+name, and `omni_renamer.py` checks and carries out the renames with undo history.
 `omni_dispatch.py` is the contextual shortcut adapter that opens the window.
 `Service.qml` is the do-nothing service stub the plugin manifest declares. The
 earlier QML overlay and theme experiments are kept on the `prototype/*` branches.
