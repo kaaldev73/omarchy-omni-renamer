@@ -24,7 +24,7 @@ keeps its normal behaviour everywhere.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/kaaldev73/Omarchy_OmniRename.git --enable
+omarchy plugin add https://github.com/kaaldev73/omarchy-omni-renamer.git --enable
 ~/.config/omarchy/plugins/io.github.omnirename.omarchy/install-omarchy.sh
 ```
 
