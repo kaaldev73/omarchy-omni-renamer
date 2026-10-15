@@ -82,6 +82,18 @@ def separator(style):
     return "_" if style == "snake_case" else "-"
 
 
+def choice_problems(choices):
+    """Problems with a typed Date or Version, which would otherwise end up in every name."""
+    problems = []
+    if choices.date and not (choices.date.isdigit() and len(choices.date) in DATE_FORMATS
+                             and is_real_date(choices.date)):
+        problems.append(f"Date {choices.date} is not a real yyyymmdd, yyyymm or yyyy date")
+    version = (choices.version or "").strip().removeprefix("v").removeprefix("V")
+    if choices.version and not version.isdigit():
+        problems.append(f"Version {choices.version} is not a number")
+    return problems
+
+
 def split_extension(original_name):
     """Split off the extension, keeping a leading dot and .tar.* together."""
     hidden = "." if original_name.startswith(".") else ""

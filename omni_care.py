@@ -8,7 +8,7 @@ from datetime import date
 from tkinter import ttk, messagebox
 
 from care_core import RenameError, RenameHistory, RenameTransaction, build_manual_plan
-from name_parts import Choices, propose_name
+from name_parts import Choices, choice_problems, propose_name
 
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")
 BACKUP_FILE = os.path.join(STATE_DIR, "rename_backlog.json")
@@ -37,6 +37,9 @@ current_paths = []
 
 def rename(paths, choices, history=None):
     """Rename every path or none; return {old path: new path} for the renamed ones."""
+    problems = choice_problems(choices)
+    if problems:
+        raise RenameError("Nothing was renamed.\n" + "\n".join(problems))
     plan = build_manual_plan((path, propose_name(Path(path).name, choices)) for path in paths)
     problems = [f"{item.source.name} → {item.destination.name}: {item.problem}"
                 for item in plan.items if item.problem]

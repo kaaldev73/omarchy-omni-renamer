@@ -79,3 +79,21 @@ class RenameTests(unittest.TestCase):
 
         self.assertEqual(source.read_text(), "A")
         self.assertFalse((self.folder / "my-report.txt").exists())
+
+    def test_a_version_that_is_not_a_number_renames_nothing(self):
+        source = self.make("Report.txt", "A")
+
+        with self.assertRaises(RenameError) as raised:
+            omni_care.rename([source], Choices(version="vabc"), self.history)
+
+        self.assertIn("Version", str(raised.exception))
+        self.assertEqual(source.read_text(), "A")
+
+    def test_a_date_that_is_not_real_renames_nothing(self):
+        source = self.make("Report.txt", "A")
+
+        with self.assertRaises(RenameError) as raised:
+            omni_care.rename([source], Choices(date="20261345"), self.history)
+
+        self.assertIn("Date", str(raised.exception))
+        self.assertEqual(source.read_text(), "A")
