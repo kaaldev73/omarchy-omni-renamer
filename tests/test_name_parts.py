@@ -45,6 +45,15 @@ class ProposeNameTests(unittest.TestCase):
     def test_a_typed_v_is_not_doubled(self):
         self.assertEqual(propose_name("report.pdf", Choices(version="v3")), "report-v3.pdf")
 
+    def test_a_version_split_by_snake_case_is_repaired(self):
+        self.assertEqual(propose_name("sales_report_v_1.docx", Choices(version="")), "sales-report-v2.docx")
+
+    def test_a_hidden_item_stays_hidden(self):
+        self.assertEqual(propose_name(".bashrc", Choices(version="2")), ".bashrc-v2")
+
+    def test_a_tar_archive_keeps_its_whole_extension(self):
+        self.assertEqual(propose_name("Report.tar.gz", Choices(version="2")), "report-v2.tar.gz")
+
 
 if __name__ == "__main__":
     unittest.main()

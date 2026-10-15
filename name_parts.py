@@ -47,7 +47,7 @@ def apply_style(name, style):
 
 
 DATE = re.compile(r'^(\d{8}|\d{6}|\d{4})(?=[-_\s])')
-VERSION = re.compile(r'[-_\s][vV]-?(\d+)$')
+VERSION = re.compile(r'[-_\s][vV][-_]?(\d+)$')
 INITIALS = re.compile(r'[-_\s]([A-Z]{2,3})$')
 DATE_FORMATS = {8: "%Y%m%d", 6: "%Y%m", 4: "%Y"}
 
@@ -82,8 +82,17 @@ def separator(style):
     return "_" if style == "snake_case" else "-"
 
 
+def split_extension(original_name):
+    """Split off the extension, keeping a leading dot and .tar.* together."""
+    hidden = "." if original_name.startswith(".") else ""
+    stem, ext = os.path.splitext(original_name.removeprefix(hidden))
+    if stem.lower().endswith(".tar"):
+        stem, ext = stem[:-4], stem[-4:] + ext
+    return hidden, stem, ext
+
+
 def propose_name(original_name, choices):
-    stem, ext = os.path.splitext(original_name)
+    hidden, stem, ext = split_extension(original_name)
     date, name, version, initials = split_name_parts(stem)
     if choices.version == "":
         version = str(int(version) + 1) if version else "1"
@@ -95,4 +104,4 @@ def propose_name(original_name, choices):
         f"v{version}" if version else None,
         choices.initials or initials,
     ]
-    return separator(choices.style).join(part for part in parts if part) + ext
+    return hidden + separator(choices.style).join(part for part in parts if part) + ext
