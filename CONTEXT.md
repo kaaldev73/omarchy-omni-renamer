@@ -7,7 +7,7 @@ Opens with `Alt+S` in Omarchy's file manager and sets how the names of the selec
 ### Building a name
 
 **Name Part**:
-One section of a new name, always in this order: Date, Name, Version, Initials.
+One section of a new name, always in this order: Date, Name, Version, Initials. A Name Part already in a name is recognised and kept unless a new one is chosen to replace it.
 _Avoid_: decoration, segment, field, prefix, suffix
 
 **Date**:
@@ -15,7 +15,7 @@ The Name Part saying when the item is from, as yyyymmdd, yyyymm or yyyy; today u
 _Avoid_: timestamp
 
 **Version**:
-The Name Part saying which revision the item is, written `v` followed by a number (`v2`).
+The Name Part saying which revision the item is, written `v` followed by a number (`v2`); asking for a Version without a number bumps the existing one, or starts at `v1`.
 _Avoid_: revision number
 
 **Initials**:

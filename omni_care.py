@@ -1,13 +1,14 @@
 
 import json
 import os
-import re
 import sys
 import tkinter as tk
 from pathlib import Path
+from datetime import date
 from tkinter import ttk, messagebox
 
 from care_core import RenameError, RenameHistory, RenameTransaction, build_manual_plan
+from name_parts import Choices, propose_name
 
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")
 BACKUP_FILE = os.path.join(STATE_DIR, "rename_backlog.json")
@@ -29,50 +30,14 @@ class CareHistory(RenameHistory):
 def default_history():
     return CareHistory(Path(BACKUP_FILE))
 
+DATE_ENTRY_FORMATS = {"yyyymmdd": "%Y%m%d", "yyyymm": "%Y%m", "yyyy": "%Y"}
+
 # Paths handed over by the dispatcher; kept current after every rename and undo
 current_paths = []
 
-def to_kebab_case(name):
-    name, ext = os.path.splitext(name)
-    name = re.sub(r'[^\w\s-]', '', name)
-    name = re.sub(r'[_\s]+', '-', name)
-    name = re.sub(r'([a-z0-9])([A-Z])', r'\1-\2', name)
-    name = re.sub(r'([0-9])([a-zA-Z])', r'\1-\2', name)
-    name = re.sub(r'([a-zA-Z])([0-9])', r'\1-\2', name)
-    return name.lower()
-
-def new_name(original_name, case_style, prefixes, suffixes):
-    name, ext = os.path.splitext(original_name)
-
-    # Convert case
-    if case_style == "kebab-case":
-        name = to_kebab_case(name)
-    elif case_style == "PascalCase":
-        name = ''.join(word.capitalize() for word in re.split(r'[_\s-]', name))
-    elif case_style == "snake_case":
-        name = to_kebab_case(name).replace("-", "_")
-    elif case_style == "camelCase":
-        parts = to_kebab_case(name).split("-")
-        name = parts[0] + ''.join(word.capitalize() for word in parts[1:])
-    elif case_style == "UPPERCASE":
-        name = name.upper()
-    elif case_style == "lowercase":
-        name = name.lower()
-    elif case_style == "Title Case":
-        name = name.title()
-    elif case_style == "Sentence case":
-        name = name.capitalize()
-
-    prefix_str = '-'.join([p for p in prefixes if p])
-    suffix_str = '-'.join([s for s in suffixes if s])
-
-    return f"{prefix_str + '-' if prefix_str else ''}{name}{'-' + suffix_str if suffix_str else ''}{ext}"
-
-def rename(paths, case_style, prefixes, suffixes, history=None):
+def rename(paths, choices, history=None):
     """Rename every path or none; return {old path: new path} for the renamed ones."""
-    plan = build_manual_plan(
-        (path, new_name(Path(path).name, case_style, prefixes, suffixes)) for path in paths
-    )
+    plan = build_manual_plan((path, propose_name(Path(path).name, choices)) for path in paths)
     problems = [f"{item.source.name} → {item.destination.name}: {item.problem}"
                 for item in plan.items if item.problem]
     if problems:
@@ -83,12 +48,12 @@ def rename(paths, case_style, prefixes, suffixes, history=None):
 def update_current_paths(moves):
     current_paths[:] = [moves.get(path, path) for path in current_paths]
 
-def rename_selected(case_style, prefixes, suffixes):
+def rename_selected(choices):
     if not current_paths:
         messagebox.showwarning("Selection Not Found", "No files or folders selected.")
         return
     try:
-        moves = rename(current_paths, case_style, prefixes, suffixes)
+        moves = rename(current_paths, choices)
     except RenameError as error:
         messagebox.showerror("Rename Failed", str(error))
         return
@@ -127,6 +92,7 @@ def main():
     root.geometry("370x420")
     root.configure(bg="#F0F0F0")
     root.bind("<Escape>", lambda event: root.destroy())
+    root.bind("<Return>", lambda event: rename_selected(get_choices()))
 
     # Case style dropdown
     style_var = tk.StringVar(value="kebab-case")
@@ -145,6 +111,7 @@ def main():
         tk.Checkbutton(f, text=label, variable=var, bg="#F0F0F0").pack(side="left")
         entry.pack(side="right")
         f.pack(pady=1)
+        entry.insert(0, date.today().strftime(DATE_ENTRY_FORMATS[label]))
         prefixes[label] = (var, entry)
 
     # Suffix UI
@@ -159,16 +126,31 @@ def main():
         f.pack(pady=1)
         suffixes[label] = (var, entry)
 
-    def get_prefix_values():
-        return [entry.get() for var, entry in prefixes.values() if var.get()]
+    # At most one Date: ticking one date box unticks the others
+    def keep_one_date(chosen):
+        if prefixes[chosen][0].get():
+            for label, (var, entry) in prefixes.items():
+                if label != chosen:
+                    var.set(False)
 
-    def get_suffix_values():
-        return [entry.get() for var, entry in suffixes.values() if var.get()]
+    for label, (var, entry) in prefixes.items():
+        var.trace_add("write", lambda *args, label=label: keep_one_date(label))
+
+    def ticked(boxes, label):
+        var, entry = boxes[label]
+        return entry.get().strip() if var.get() else None
+
+    def get_choices():
+        dates = [ticked(prefixes, label) for label in prefixes if prefixes[label][0].get()]
+        return Choices(
+            style_var.get(),
+            date=dates[0] if dates else None,
+            version=ticked(suffixes, "v"),
+            initials=ticked(suffixes, "initials") or None,
+        )
 
     # Buttons
-    tk.Button(root, text="Rename", command=lambda: rename_selected(
-        style_var.get(), get_prefix_values(), get_suffix_values()
-    ), bg="#4CAF50", fg="white", font=("Segoe UI", 10, "bold")).pack(pady=(8, 2), padx=20, fill="x")
+    tk.Button(root, text="Rename", command=lambda: rename_selected(get_choices()), bg="#4CAF50", fg="white", font=("Segoe UI", 10, "bold")).pack(pady=(8, 2), padx=20, fill="x")
 
     tk.Button(root, text="Undo Rename", command=undo_selected,
               bg="#607D8B", fg="white", font=("Segoe UI", 10, "bold")).pack(pady=(0, 10), padx=20, fill="x")

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import omni_care
 from care_core import RenameError
+from name_parts import Choices
 
 
 class RenameTests(unittest.TestCase):
@@ -26,7 +27,7 @@ class RenameTests(unittest.TestCase):
         second = self.make("report.txt", "B")
 
         with self.assertRaises(RenameError) as raised:
-            omni_care.rename([first, second], "kebab-case", [], ["1"], self.history)
+            omni_care.rename([first, second], Choices(version="1"), self.history)
 
         self.assertIn("More than one item would receive this name", str(raised.exception))
         self.assertEqual(sorted(p.name for p in self.folder.glob("*.txt")), ["Report.txt", "report.txt"])
@@ -35,19 +36,19 @@ class RenameTests(unittest.TestCase):
 
     def test_an_existing_name_renames_nothing(self):
         source = self.make("Report.txt", "A")
-        self.make("report-1.txt", "B")
+        self.make("report-v1.txt", "B")
 
         with self.assertRaises(RenameError) as raised:
-            omni_care.rename([source], "kebab-case", [], ["1"], self.history)
+            omni_care.rename([source], Choices(version="1"), self.history)
 
         self.assertIn("already exists", str(raised.exception))
         self.assertEqual(source.read_text(), "A")
-        self.assertEqual((self.folder / "report-1.txt").read_text(), "B")
+        self.assertEqual((self.folder / "report-v1.txt").read_text(), "B")
 
     def test_undo_restores_what_rename_changed(self):
         source = self.make("My Report.txt", "A")
 
-        moves = omni_care.rename([source], "kebab-case", [], [], self.history)
+        moves = omni_care.rename([source], Choices("kebab-case"), self.history)
         renamed = self.folder / "my-report.txt"
         self.assertEqual(moves, {str(source): str(renamed)})
 
