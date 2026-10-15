@@ -1,4 +1,3 @@
-import json
 import unittest
 from unittest import mock
 
@@ -15,7 +14,7 @@ class F2AdapterTests(unittest.TestCase):
 
         popen.assert_called_once_with(["wtype", "-k", "F2"])
 
-    def test_f2_in_the_file_manager_opens_the_gtk_window(self):
+    def test_f2_in_the_file_manager_opens_care_with_the_selection(self):
         with (
             mock.patch.object(care_f2, "active_class", return_value="org.gnome.nautilus"),
             mock.patch.object(care_f2, "selected_paths", return_value=["/tmp/a.txt"]),
@@ -24,8 +23,8 @@ class F2AdapterTests(unittest.TestCase):
             care_f2.main()
 
         command = popen.call_args.args[0]
-        self.assertTrue(command[1].endswith("omni_gtk.py"))
-        self.assertEqual(json.loads(command[2]), {"paths": ["/tmp/a.txt"]})
+        self.assertTrue(command[1].endswith("CaRe_1.1.py"))
+        self.assertEqual(command[2:], ["/tmp/a.txt"])
 
 
 if __name__ == "__main__":

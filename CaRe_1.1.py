@@ -1,13 +1,16 @@
 
 import os
 import re
+import sys
 import json
 import tkinter as tk
 from tkinter import ttk, messagebox
-import pythoncom
-import win32com.client
 
-BACKUP_FILE = os.path.join(os.path.dirname(__file__), "rename_backlog.json")
+STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "omnirename")
+BACKUP_FILE = os.path.join(STATE_DIR, "rename_backlog.json")
+
+# Paths handed over by the F2 dispatcher; kept current after every rename and undo
+current_paths = [os.path.abspath(p) for p in sys.argv[1:]]
 
 def to_kebab_case(name):
     name, ext = os.path.splitext(name)
@@ -19,18 +22,7 @@ def to_kebab_case(name):
     return name.lower()
 
 def get_selected_items():
-    pythoncom.CoInitialize()
-    shell = win32com.client.Dispatch("Shell.Application")
-    all_paths = []
-    for window in shell.Windows():
-        try:
-            if window and window.Document:
-                items = window.Document.SelectedItems()
-                for i in range(items.Count):
-                    all_paths.append(items.Item(i).Path)
-        except Exception:
-            continue
-    return all_paths
+    return list(current_paths)
 
 def load_backup():
     if os.path.exists(BACKUP_FILE):
@@ -39,6 +31,7 @@ def load_backup():
     return {}
 
 def save_backup(backup):
+    os.makedirs(STATE_DIR, exist_ok=True)
     with open(BACKUP_FILE, 'w') as f:
         json.dump(backup, f, indent=2)
 
@@ -86,6 +79,7 @@ def rename_selected(case_style, prefixes, suffixes):
                 os.rename(path, new_path)
                 renamed.append(f"{original_name} → {new_name}")
                 backup[new_path] = path
+                current_paths[current_paths.index(path)] = new_path
             except Exception as e:
                 messagebox.showerror("Rename Failed", f"{original_name} → {e}")
 
@@ -105,6 +99,7 @@ def undo_selected():
                 os.rename(path, original_path)
                 undone.append(os.path.basename(path))
                 del backup[path]
+                current_paths[current_paths.index(path)] = original_path
             except Exception as e:
                 messagebox.showerror("Undo Failed", f"{path} → {e}")
         else:
@@ -115,6 +110,7 @@ def undo_selected():
                         os.rename(path, original)
                         undone.append(os.path.basename(path))
                         del backup[renamed]
+                        current_paths[current_paths.index(path)] = original
                         break
                     except Exception as e:
                         messagebox.showerror("Restore Failed", f"{path} → {e}")
