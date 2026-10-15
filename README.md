@@ -6,44 +6,31 @@ forwarded to the focused application unchanged, and `F2` keeps its normal
 behaviour everywhere.
 
 The UI is a tkinter window (`omni_care.py`, based on the earlier CaRe app) that
-`Alt+S` opens on the current Nautilus selection. The earlier GTK window
-(`omni_gtk.py`) stays in the repository but nothing opens it any more; the
-Features list and the Command Mode section below describe that GTK window. The
-Omarchy plugin itself is a thin stub: it declares a do-nothing service so that
-`omarchy plugin add` can install the files, and the install script adds the
-`Alt+S` binding.
+`Alt+S` opens on the current Nautilus selection. The Omarchy plugin itself is a
+thin stub: it declares a do-nothing service so that `omarchy plugin add` can
+install the files, and the install script adds the `Alt+S` binding.
 
 ## Features
 
-- Live old/new-name preview
 - Files and folders in one batch
 - kebab, snake, Pascal, camel, upper, lower, title, and sentence case
-- Plain or regular-expression find and replace
-- Case-sensitive matching
-- Date, custom prefix, and suffix decorations
-- Person-name decoration before or after the base filename
-- Named presets that restore a complete set of naming rules
-- Configurable sequence start, step, padding, and position
-- Left/right character trimming
-- Duplicate, existing-target, invalid-name, and stale-preview checks
-- Transactional staging with rollback diagnostics
+- Names built as Date, Name, Version, Initials; parts already in a name are kept
+- A Version without a number bumps the existing one, or starts at `v1`
+- All selected items rename together or none do; nothing is ever overwritten
 - Persistent, atomic undo history
-- Native Omarchy theme colors
-- Optional Codex-powered contextual filename Suggestions
-- Metadata-only agent mode by default; text excerpts require explicit opt-in
-- Local deterministic Suggestions when Codex is unavailable
 
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/YOUR-NAME/omnirename.git --enable
+omarchy plugin add https://github.com/kaaldev73/Omarchy_OmniRename.git --enable
 ~/.config/omarchy/plugins/io.github.omnirename.omarchy/install-omarchy.sh
 ```
 
-The installer backs up `~/.config/hypr/bindings.lua`, adds one contextual `Alt+S`
-binding (replacing the `F2` one from earlier versions), rescans the Omarchy shell, reloads Hyprland, and checks configuration
-errors. Dependencies (`python` and `wl-clipboard`) are already present
-in a standard Omarchy installation.
+The installer backs up `~/.config/hypr/bindings.lua` on first install, adds one
+contextual `Alt+S` binding (replacing the `F2` one from earlier versions),
+rescans the Omarchy shell, reloads Hyprland, and checks configuration errors.
+Dependencies (`python` and `wl-clipboard`) are already present in a standard
+Omarchy installation.
 
 ## Use
 
@@ -56,41 +43,18 @@ in a standard Omarchy installation.
 The rename history is kept in `~/.local/state/omnirename/rename_backlog.json`.
 The window floats centred thanks to a Hyprland window rule the installer adds.
 
-### Command Mode key
-
-Commands are typed while holding backtick; tapping it alone types a literal
-backtick. If backtick is a dead key on your keyboard layout, choose another key
-in `~/.config/OmniRename/settings.json` (or under `$XDG_CONFIG_HOME`):
-
-```json
-{ "command_key": "#" }
-```
-
-The value is the single character the key types. Choose a key typed without
-Shift or AltGr (on German layouts `#` or `<`), since a held modifier changes the
-digits typed in Commands, and not a dead key. It cannot be a letter, digit,
-space or `/`, because those appear in Commands. A missing, unreadable or invalid
-setting falls back to backtick. The cheat sheet (`/` Command) shows the key in use.
-
-Suggestions in the window are local and deterministic; nothing is sent to an
-agent. The optional Codex agent (`omni_agent.py`) runs ephemerally with a
-read-only sandbox and a strict JSON response schema, shares only filenames and
-basic metadata unless text excerpts are explicitly enabled, and is not wired
-into the window.
-
 ## Development
 
 ```bash
-python -m unittest discover -s tests -v
-python care_cli.py preview '{"paths":["/tmp/Example File.txt"],"options":{"case_style":"kebab-case"}}'
+python -m unittest discover -s tests -p "test_*.py" -v
 omarchy plugin validate .
 ```
 
-`care_core.py` is the safe rename engine and `care_cli.py` is the JSON bridge.
-`omni_session.py` holds the Rename Session behind the window, and `omni_gtk.py` is
-the GTK window that draws it. `omni_care.py` is the window `Alt+S` opens, and
-`omni_dispatch.py` is the contextual shortcut adapter that opens it. `Service.qml` is the do-nothing service stub the plugin manifest
-declares. The earlier QML overlay is kept on the `prototype/qml-overlay` branch.
+`omni_care.py` is the window `Alt+S` opens, `name_parts.py` builds each new
+name, and `care_core.py` checks and carries out the renames with undo history.
+`omni_dispatch.py` is the contextual shortcut adapter that opens the window.
+`Service.qml` is the do-nothing service stub the plugin manifest declares. The
+earlier QML overlay and theme experiments are kept on the `prototype/*` branches.
 
 ## Remove
 

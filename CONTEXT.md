@@ -31,35 +31,3 @@ _Avoid_: case, format
 **Problem**:
 A reason an item cannot be renamed (duplicate result, existing target, invalid name, missing source, a typed Date or Version that is not valid); any Problem stops the whole rename.
 _Avoid_: error, conflict, warning
-
-## GTK window (unused)
-
-These terms describe the earlier GTK window, which stays in the repository but nothing opens. Delete them when that code goes.
-
-**Pill**:
-The on-screen form of a Name Part; a pill is shown exactly when its Name Part is in use.
-_Avoid_: chip, tag
-
-**Preset**:
-A saved, named set of rules that restores every Name Part and Style at once.
-_Avoid_: profile, template
-
-**Suggestion**:
-A proposed name per item that replaces the rules for that rename, offered by the agent and always shown in the Preview before use.
-_Avoid_: recommendation, AI name
-
-**Command Mode**:
-The state that lasts while the Command Mode key (backtick unless configured otherwise) is held down, like a modifier key; keys typed meanwhile form a Command instead of text, and releasing the key ends it.
-_Avoid_: leader mode, magic mode
-
-**Command**:
-A short key code typed in Command Mode that acts on a Name Part, Style, Preset, or the rename itself.
-_Avoid_: shortcut, sequence, magic key
-
-**Preview**:
-The list of every selected item with its current name and the name it would receive.
-_Avoid_: plan (in UI language), dry run
-
-**Safe Preview**:
-A Preview with no Problems; only a Safe Preview can be renamed, and all items rename together or none do.
-_Avoid_: valid plan
