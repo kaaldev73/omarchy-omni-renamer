@@ -1,16 +1,17 @@
 # OmniRename for Omarchy
 
-OmniRename replaces the normal `F2` rename flow in Omarchy's Nautilus file manager
-with a small batch renamer. Outside Nautilus, `F2` is forwarded to the focused
-application unchanged.
+OmniRename opens with `Alt+S` in Omarchy's Nautilus file manager and sets how
+the names of the selected files and folders look. Outside Nautilus, `Alt+S` is
+forwarded to the focused application unchanged, and `F2` keeps its normal
+behaviour everywhere.
 
 The UI is a tkinter window (`omni_care.py`, based on the earlier CaRe app) that
-`F2` opens on the current Nautilus selection. The earlier GTK window
-(`omni_gtk.py`) stays in the repository but `F2` no longer opens it; the
+`Alt+S` opens on the current Nautilus selection. The earlier GTK window
+(`omni_gtk.py`) stays in the repository but nothing opens it any more; the
 Features list and the Command Mode section below describe that GTK window. The
 Omarchy plugin itself is a thin stub: it declares a do-nothing service so that
 `omarchy plugin add` can install the files, and the install script adds the
-`F2` binding.
+`Alt+S` binding.
 
 ## Features
 
@@ -39,15 +40,15 @@ omarchy plugin add https://github.com/YOUR-NAME/omnirename.git --enable
 ~/.config/omarchy/plugins/io.github.omnirename.omarchy/install-omarchy.sh
 ```
 
-The installer backs up `~/.config/hypr/bindings.lua`, adds one contextual `F2`
-binding, rescans the Omarchy shell, reloads Hyprland, and checks configuration
+The installer backs up `~/.config/hypr/bindings.lua`, adds one contextual `Alt+S`
+binding (replacing the `F2` one from earlier versions), rescans the Omarchy shell, reloads Hyprland, and checks configuration
 errors. Dependencies (`python`, `wtype`, and `wl-clipboard`) are already present
 in a standard Omarchy installation.
 
 ## Use
 
 1. Select one or more local files or folders in Nautilus.
-2. Press `F2` to open the OmniRename window.
+2. Press `Alt+S` to open the OmniRename window.
 3. Choose a case style, tick any prefix or suffix and type its value.
 4. Press **Rename**. **Undo Rename** restores the original names of the files
    the window was opened on. `Escape` closes the window.
@@ -87,8 +88,8 @@ omarchy plugin validate .
 
 `care_core.py` is the safe rename engine and `care_cli.py` is the JSON bridge.
 `omni_session.py` holds the Rename Session behind the window, and `omni_gtk.py` is
-the GTK window that draws it. `care_f2.py` is the contextual shortcut adapter that
-opens the window. `Service.qml` is the do-nothing service stub the plugin manifest
+the GTK window that draws it. `omni_care.py` is the window `Alt+S` opens, and
+`omni_dispatch.py` is the contextual shortcut adapter that opens it. `Service.qml` is the do-nothing service stub the plugin manifest
 declares. The earlier QML overlay is kept on the `prototype/qml-overlay` branch.
 
 ## Remove

@@ -1,4 +1,4 @@
-"""Contextual F2 dispatcher for OmniRename on Omarchy."""
+"""Contextual Alt+S dispatcher for OmniRename on Omarchy."""
 
 from __future__ import annotations
 
@@ -38,17 +38,17 @@ def selected_paths() -> list[str]:
     return paths
 
 
-def forward_f2() -> None:
-    subprocess.Popen(["wtype", "-k", "F2"])
+def forward_shortcut() -> None:
+    subprocess.Popen(["wtype", "-M", "alt", "s", "-m", "alt"])
 
 
 def main() -> int:
     if active_class() not in FILE_MANAGERS:
-        forward_f2()
+        forward_shortcut()
         return 0
     paths = selected_paths()
     if not paths:
-        forward_f2()
+        forward_shortcut()
         return 0
     plugin_dir = Path(__file__).resolve().parent
     subprocess.Popen(["python", str(plugin_dir / "omni_care.py"), *paths])

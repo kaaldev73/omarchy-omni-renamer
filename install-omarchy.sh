@@ -4,25 +4,31 @@ set -euo pipefail
 plugin_id="io.github.omnirename.omarchy"
 plugin_dir="$HOME/.config/omarchy/plugins/$plugin_id"
 bindings="$HOME/.config/hypr/bindings.lua"
-start_marker="-- OmniRename F2 integration: start"
-end_marker="-- OmniRename F2 integration: end"
+start_marker="-- OmniRename integration: start"
+end_marker="-- OmniRename integration: end"
 
 if [[ ! -f "$plugin_dir/manifest.json" ]]; then
   echo "Install this repository with 'omarchy plugin add <git-url> --enable' first." >&2
   exit 1
 fi
 
-if ! grep -Fq -- "$start_marker" "$bindings"; then
-  cp "$bindings" "$bindings.care-backup"
-  {
-    printf '\n%s\n' "$start_marker"
-    printf '%s\n' '-- F2 was previously handled directly by each application.'
-    printf '%s\n' '-- OmniRename handles Nautilus selections and forwards F2 everywhere else.'
-    printf '%s\n' "o.bind(\"F2\", \"OmniRename / forward F2\", \"python $plugin_dir/care_f2.py\")"
-    printf '%s\n' 'o.window("^Omnirename$", { float = true, center = true })'
-    printf '%s\n' "$end_marker"
-  } >> "$bindings"
-fi
+# Replace any earlier OmniRename block, including the old F2 one, with the current one
+cp "$bindings" "$bindings.omnirename-backup"
+temporary="$(mktemp)"
+awk '
+  $0 == "-- OmniRename integration: start" || $0 == "-- OmniRename F2 integration: start" { skipping=1; next }
+  $0 == "-- OmniRename integration: end" || $0 == "-- OmniRename F2 integration: end" { skipping=0; next }
+  !skipping { print }
+' "$bindings" > "$temporary"
+{
+  printf '%s\n' "$start_marker"
+  printf '%s\n' '-- OmniRename opens on the Nautilus selection and forwards Alt+S everywhere else.'
+  printf '%s\n' "o.bind(\"ALT + S\", \"OmniRename / forward Alt+S\", \"python $plugin_dir/omni_dispatch.py\")"
+  printf '%s\n' 'o.window("^Omnirename$", { float = true, center = true })'
+  printf '%s\n' "$end_marker"
+} >> "$temporary"
+install -m 0644 "$temporary" "$bindings"
+rm -f "$temporary"
 
 omarchy-shell shell rescanPlugins >/dev/null || true
 omarchy plugin enable "$plugin_id" >/dev/null
@@ -33,4 +39,4 @@ if [[ -n "$errors" ]]; then
   exit 1
 fi
 
-echo "OmniRename now handles F2 in Nautilus and forwards F2 in other applications."
+echo "OmniRename now opens with Alt+S in Nautilus and forwards Alt+S in other applications."

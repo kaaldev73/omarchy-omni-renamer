@@ -1,6 +1,6 @@
 import QtQuick
 
-// OmniRename's UI is the GTK window launched by care_f2.py on F2.
+// OmniRename's UI is the window omni_dispatch.py launches on Alt+S.
 // This do-nothing service exists only so `omarchy plugin add` can install the plugin.
 Item {
 }
