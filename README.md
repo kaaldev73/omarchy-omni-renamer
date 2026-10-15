@@ -52,8 +52,7 @@ checks for configuration errors.
 5. Press **Rename** (or `Enter`).
 
 The result shows at the bottom of the window; **Show all** lists every item
-when there are several. After a successful rename the window closes by itself
-after 3 seconds, unless you press **Show all** or **Undo Rename** first.
+when there are several. The window stays open until you press `Escape`.
 
 If anything would go wrong, such as two items ending up with the same name, an
 existing item in the way, or an invalid Date, nothing is renamed and the window

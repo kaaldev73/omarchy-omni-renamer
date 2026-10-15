@@ -241,7 +241,7 @@ HELP_RENAME = [
     "Select one or more files or folders in Nautilus",
     "Press Alt+S to open this window",
     "Type a new Name if you want one (the Name box shows only when one item is selected), choose a Style, and tick a Date, Version or Initials",
-    "Press Rename (or Enter); the window closes after 3 seconds",
+    "Press Rename (or Enter); Escape closes the window",
 ]
 
 HELP_UNDO = [
@@ -497,16 +497,7 @@ def main():
                       bg=palette["surface"], fg=palette["foreground"], padx=10, pady=6,
                       highlightthickness=0)
 
-    closing = None
-
-    def stay_open():
-        nonlocal closing
-        if closing:
-            root.after_cancel(closing)
-            closing = None
-
     def show(report):
-        stay_open()
         refresh_placeholder()
         kind, headline, lines = report
         colour = {"success": palette["success"], "error": palette["error"]}.get(kind, palette["muted"])
@@ -524,7 +515,6 @@ def main():
         status.grid(row=status_row, column=0, columnspan=2, sticky="ew", pady=(14, 0))
         if lines:
             def toggle():
-                stay_open()
                 if details.winfo_ismapped():
                     details.pack_forget()
                     show_all.configure(text=f"Show all {len(lines)}")
@@ -534,14 +524,6 @@ def main():
             show_all.configure(text=f"Show all {len(lines)}", command=toggle, bg=tint, activebackground=tint)
             show_all.pack(anchor="w", padx=10, pady=(0, 8))
 
-    # A successful rename closes the window after 3 seconds unless Show all or Undo is used
-    def rename_and_close():
-        nonlocal closing
-        report = rename_selected(get_choices())
-        show(report)
-        if report[0] == "success":
-            status_text.configure(text=report[1] + "\nClosing in 3 seconds")
-            closing = root.after(3000, root.destroy)
 
     buttons = ttk.Frame(form)
     buttons.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(16, 0))
@@ -549,7 +531,7 @@ def main():
     row += 1
     status_row = row
     ttk.Button(buttons, text="Rename", style="Rename.TButton",
-               command=rename_and_close).grid(row=0, column=0, sticky="ew")
+               command=lambda: show(rename_selected(get_choices()))).grid(row=0, column=0, sticky="ew")
     # Undo Rename opens the History page; restoring returns to the form with the result
     def restore_and_show(path, earlier):
         toggle_page("history")
@@ -560,8 +542,8 @@ def main():
         show(undo_selected())
 
     ttk.Button(buttons, text="Undo Rename", style="Undo.TButton",
-               command=lambda: (stay_open(), toggle_page("history"))).grid(row=1, column=0, sticky="ew", pady=(6, 0))
-    root.bind("<Return>", lambda event: rename_and_close())
+               command=lambda: toggle_page("history")).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+    root.bind("<Return>", lambda event: show(rename_selected(get_choices())))
 
     root.mainloop()
 
