@@ -314,8 +314,8 @@ class RenameTransaction:
         if not plan.is_safe:
             raise RenameError("Resolve the preview errors before renaming.")
         pairs = [(item.source, item.destination) for item in plan.changed_items]
-        self._execute_pairs(pairs)
         history = self.history.load()
+        self._execute_pairs(pairs)
         for source, destination in pairs:
             history[str(destination)] = str(source)
         try:

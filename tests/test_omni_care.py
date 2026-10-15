@@ -68,3 +68,14 @@ class RenameTests(unittest.TestCase):
 
         self.assertEqual(restored, {str(renamed): str(original)})
         self.assertEqual(original.read_text(), "A")
+
+    def test_unreadable_history_renames_nothing(self):
+        source = self.make("My Report.txt", "A")
+        self.history.path.parent.mkdir()
+        self.history.path.write_text("not json")
+
+        with self.assertRaises(RenameError):
+            omni_care.rename([source], Choices("kebab-case"), self.history)
+
+        self.assertEqual(source.read_text(), "A")
+        self.assertFalse((self.folder / "my-report.txt").exists())
